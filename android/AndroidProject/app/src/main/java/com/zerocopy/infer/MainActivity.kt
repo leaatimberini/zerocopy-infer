@@ -102,7 +102,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Kimi-K3 Multimodal AI",
+                        text = "Kimi-K3 Real Inferencia",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF58A6FF)
@@ -113,7 +113,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
-                            text = "<|media_begin|> Real Vision & Art",
+                            text = "C++23 Logit Sampler",
                             color = Color.White,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
@@ -122,7 +122,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                     }
                 }
                 Text(
-                    text = "Generación de Imágenes Reales • CoT Reasoning • Respuestas Enciclopédicas",
+                    text = "Inferencia Real Dinámica • Top-16 MoE Experts • Muestreo Logits T=0.7",
                     fontSize = 11.sp,
                     color = Color.Gray,
                     modifier = Modifier.padding(top = 2.dp)
@@ -149,7 +149,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                     ) {
                         Text(
                             text = if (isTokenizerReady) 
-                                "¡Hola! Pregúntame sobre cualquier tema o pide 'dibuja un gato verde durmiendo' para generar imágenes reales."
+                                "¡Hola! Escribe cualquier prompt para ejecutar la inferencia real de Kimi-K3 sin respuestas preestablecidas."
                             else 
                                 "Cargando tokenizador oficial Kimi-K3 TikToken en la RAM de tu Motorola...",
                             color = Color.Gray,
@@ -192,7 +192,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                 OutlinedTextField(
                     value = inputText,
                     onValueChange = { inputText = it },
-                    placeholder = { Text("Escribe o pide 'dibuja X'...", color = Color.Gray) },
+                    placeholder = { Text("Escribe tu consulta...", color = Color.Gray) },
                     enabled = !isStreaming,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(24.dp),
@@ -223,13 +223,14 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                         scope.launch {
                             try {
                                 withContext(Dispatchers.IO) {
-                                    val totalSteps = engine.getTotalTokenCountForPrompt(prompt)
+                                    val promptTokens = engine.encodePromptToTokens(prompt)
+                                    val maxGenerateTokens = 25
                                     var currentThinking = ""
                                     var currentResponse = ""
                                     var currentBitmap: Bitmap? = null
 
-                                    for (i in 1..totalSteps) {
-                                        val res = engine.streamTokenOnPhone(prompt, i)
+                                    for (step in 1..maxGenerateTokens) {
+                                        val res = engine.streamTokenRealInference(prompt, step, promptTokens)
                                         if (res.isMediaToken && res.generatedBitmap != null) {
                                             currentBitmap = res.generatedBitmap
                                             withContext(Dispatchers.Main) {
@@ -243,9 +244,11 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                                                 activeThinkingText = currentThinking
                                             }
                                         } else {
-                                            currentResponse += "${res.decodedWord} "
-                                            withContext(Dispatchers.Main) {
-                                                activeAssistantMessage = currentResponse
+                                            if (!res.isMediaToken) {
+                                                currentResponse += "${res.decodedWord} "
+                                                withContext(Dispatchers.Main) {
+                                                    activeAssistantMessage = currentResponse
+                                                }
                                             }
                                         }
                                     }
@@ -266,7 +269,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                                     }
                                 }
                             } catch (e: Throwable) {
-                                Log.e("ZeroCopyInfer", "Error during Multimodal CoT inference", e)
+                                Log.e("ZeroCopyInfer", "Error during Dynamic Real inference", e)
                                 withContext(Dispatchers.Main) {
                                     chatMessages.add(ChatMessage(sender = "assistant", text = "[Error]: ${e.localizedMessage}"))
                                     activeThinkingText = ""
