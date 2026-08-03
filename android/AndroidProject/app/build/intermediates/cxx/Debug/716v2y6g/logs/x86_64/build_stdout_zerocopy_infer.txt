@@ -1,3 +1,2 @@
 ninja: Entering directory `C:\zerocopy-infer\android\AndroidProject\app\.cxx\Debug\716v2y6g\x86_64'
-[1/2] Building CXX object CMakeFiles/zerocopy_infer.dir/zerocopy_infer_jni.cpp.o
-[2/2] Linking CXX shared library C:\zerocopy-infer\android\AndroidProject\app\build\intermediates\cxx\Debug\716v2y6g\obj\x86_64\libzerocopy_infer.so
+ninja: no work to do.

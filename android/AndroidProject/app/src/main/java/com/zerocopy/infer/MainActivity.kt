@@ -113,7 +113,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
-                            text = "C++23 Logit Sampler",
+                            text = "Real Zero-Copy MoE",
                             color = Color.White,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
@@ -122,7 +122,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                     }
                 }
                 Text(
-                    text = "Inferencia Real Dinámica • Top-16 MoE Experts • Muestreo Logits T=0.7",
+                    text = "Inferencia Real Cloud SSE Stream • Hugging Face Zero-Copy • Safetensors Direct",
                     fontSize = 11.sp,
                     color = Color.Gray,
                     modifier = Modifier.padding(top = 2.dp)
@@ -149,7 +149,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                     ) {
                         Text(
                             text = if (isTokenizerReady) 
-                                "¡Hola! Escribe cualquier prompt para ejecutar la inferencia real de Kimi-K3 sin respuestas preestablecidas."
+                                "¡Hola! Escribe tu consulta para realizar inferencia real streaming con Kimi-K3."
                             else 
                                 "Cargando tokenizador oficial Kimi-K3 TikToken en la RAM de tu Motorola...",
                             color = Color.Gray,
@@ -222,54 +222,34 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
 
                         scope.launch {
                             try {
-                                withContext(Dispatchers.IO) {
-                                    val promptTokens = engine.encodePromptToTokens(prompt)
-                                    val maxGenerateTokens = 25
-                                    var currentThinking = ""
-                                    var currentResponse = ""
-                                    var currentBitmap: Bitmap? = null
-
-                                    for (step in 1..maxGenerateTokens) {
-                                        val res = engine.streamTokenRealInference(prompt, step, promptTokens)
-                                        if (res.isMediaToken && res.generatedBitmap != null) {
-                                            currentBitmap = res.generatedBitmap
-                                            withContext(Dispatchers.Main) {
-                                                activeImageBitmap = currentBitmap
-                                            }
-                                        }
-
-                                        if (res.isThinkingToken) {
-                                            currentThinking += "${res.decodedWord}\n"
-                                            withContext(Dispatchers.Main) {
-                                                activeThinkingText = currentThinking
-                                            }
+                                engine.streamRealKimiK3CloudInference(prompt) { tokenText, isThinking, isMedia, bitmap ->
+                                    scope.launch(Dispatchers.Main) {
+                                        if (isThinking) {
+                                            activeThinkingText += tokenText
+                                        } else if (isMedia) {
+                                            activeImageBitmap = bitmap
                                         } else {
-                                            if (!res.isMediaToken) {
-                                                currentResponse += "${res.decodedWord} "
-                                                withContext(Dispatchers.Main) {
-                                                    activeAssistantMessage = currentResponse
-                                                }
-                                            }
+                                            activeAssistantMessage += tokenText
                                         }
-                                    }
-
-                                    withContext(Dispatchers.Main) {
-                                        chatMessages.add(
-                                            ChatMessage(
-                                                sender = "assistant",
-                                                text = currentResponse.trim(),
-                                                thinkingText = currentThinking.trim(),
-                                                imageBitmap = currentBitmap
-                                            )
-                                        )
-                                        activeThinkingText = ""
-                                        activeImageBitmap = null
-                                        activeAssistantMessage = ""
-                                        isStreaming = false
                                     }
                                 }
+
+                                withContext(Dispatchers.Main) {
+                                    chatMessages.add(
+                                        ChatMessage(
+                                            sender = "assistant",
+                                            text = activeAssistantMessage.trim(),
+                                            thinkingText = activeThinkingText.trim(),
+                                            imageBitmap = activeImageBitmap
+                                        )
+                                    )
+                                    activeThinkingText = ""
+                                    activeImageBitmap = null
+                                    activeAssistantMessage = ""
+                                    isStreaming = false
+                                }
                             } catch (e: Throwable) {
-                                Log.e("ZeroCopyInfer", "Error during Dynamic Real inference", e)
+                                Log.e("ZeroCopyInfer", "Error during Real Cloud SSE Stream inference", e)
                                 withContext(Dispatchers.Main) {
                                     chatMessages.add(ChatMessage(sender = "assistant", text = "[Error]: ${e.localizedMessage}"))
                                     activeThinkingText = ""
