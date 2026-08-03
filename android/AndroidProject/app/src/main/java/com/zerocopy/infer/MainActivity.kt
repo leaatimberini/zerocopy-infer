@@ -4,7 +4,10 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,11 +15,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,13 +63,13 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
     var inputText by remember { mutableStateOf("") }
     val chatMessages = remember { mutableStateListOf<ChatMessage>() }
     var isStreaming by remember { mutableStateOf(false) }
+    var activeThinkingText by remember { mutableStateOf("") }
     var activeAssistantMessage by remember { mutableStateOf("") }
     var isTokenizerReady by remember { mutableStateOf(false) }
     
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    // Load Kimi-K3 TikToken BPE tokenizer directly on Motorola phone network startup
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             engine.loadRemoteKimiTokenizerOnPhone()
@@ -71,8 +77,8 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
         isTokenizerReady = true
     }
 
-    LaunchedEffect(chatMessages.size, activeAssistantMessage) {
-        if (chatMessages.isNotEmpty() || activeAssistantMessage.isNotEmpty()) {
+    LaunchedEffect(chatMessages.size, activeAssistantMessage, activeThinkingText) {
+        if (chatMessages.isNotEmpty() || activeAssistantMessage.isNotEmpty() || activeThinkingText.isNotEmpty()) {
             listState.animateScrollToItem((chatMessages.size + if (isStreaming) 1 else 0).coerceAtLeast(0))
         }
     }
@@ -91,19 +97,19 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "ZeroCopy-Infer Chat",
+                        text = "Kimi-K3 CoT Reasoning",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF58A6FF)
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     Surface(
-                        color = Color(0xFF238636),
+                        color = Color(0xFFD29922),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
-                            text = "0 Bytes SSD",
-                            color = Color.White,
+                            text = "<|open|> CoT Thinking",
+                            color = Color.Black,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -111,7 +117,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                     }
                 }
                 Text(
-                    text = "Kimi-K3 • Cloud HTTP Range Stream • Motorola Edge / G",
+                    text = "Moonshot Kimi-K3 • Top-16 Specialist Expert Router • Motorola RAM",
                     fontSize = 11.sp,
                     color = Color.Gray,
                     modifier = Modifier.padding(top = 2.dp)
@@ -119,14 +125,14 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
             }
         }
 
-        // Chat Message Area
+        // Chat Messages Area
         LazyColumn(
             state = listState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (chatMessages.isEmpty() && !isStreaming) {
                 item {
@@ -138,7 +144,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                     ) {
                         Text(
                             text = if (isTokenizerReady) 
-                                "¡Hola! Escribe cualquier pregunta para transmitir inferencia real desde Hugging Face."
+                                "¡Hola! Escribe cualquier consulta para activar el razonamiento profundo <|open|> y los expertos MoE de Kimi-K3."
                             else 
                                 "Cargando tokenizador oficial Kimi-K3 TikToken en la RAM de tu Motorola...",
                             color = Color.Gray,
@@ -154,7 +160,13 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
 
             if (isStreaming) {
                 item {
-                    ChatBubble(ChatMessage(sender = "assistant", text = activeAssistantMessage))
+                    ChatBubble(
+                        ChatMessage(
+                            sender = "assistant",
+                            text = activeAssistantMessage,
+                            thinkingText = activeThinkingText
+                        )
+                    )
                 }
             }
         }
@@ -174,7 +186,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                 OutlinedTextField(
                     value = inputText,
                     onValueChange = { inputText = it },
-                    placeholder = { Text("Escribe tu mensaje...", color = Color.Gray) },
+                    placeholder = { Text("Escribe tu consulta...", color = Color.Gray) },
                     enabled = !isStreaming,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(24.dp),
@@ -198,33 +210,49 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                         inputText = ""
                         chatMessages.add(ChatMessage(sender = "user", text = prompt))
                         isStreaming = true
+                        activeThinkingText = ""
                         activeAssistantMessage = ""
 
                         scope.launch {
                             try {
                                 withContext(Dispatchers.IO) {
-                                    val numTokens = engine.getWordCountForPrompt(prompt)
-                                    var currentText = ""
+                                    val totalSteps = engine.getTotalTokenCountForPrompt(prompt)
+                                    var currentThinking = ""
+                                    var currentResponse = ""
 
-                                    for (i in 1..numTokens) {
+                                    for (i in 1..totalSteps) {
                                         val res = engine.streamTokenOnPhone(prompt, i)
-                                        currentText += "${res.decodedWord} "
-
-                                        withContext(Dispatchers.Main) {
-                                            activeAssistantMessage = currentText
+                                        if (res.isThinkingToken) {
+                                            currentThinking += "${res.decodedWord}\n"
+                                            withContext(Dispatchers.Main) {
+                                                activeThinkingText = currentThinking
+                                            }
+                                        } else {
+                                            currentResponse += "${res.decodedWord} "
+                                            withContext(Dispatchers.Main) {
+                                                activeAssistantMessage = currentResponse
+                                            }
                                         }
                                     }
 
                                     withContext(Dispatchers.Main) {
-                                        chatMessages.add(ChatMessage(sender = "assistant", text = currentText.trim()))
+                                        chatMessages.add(
+                                            ChatMessage(
+                                                sender = "assistant",
+                                                text = currentResponse.trim(),
+                                                thinkingText = currentThinking.trim()
+                                            )
+                                        )
+                                        activeThinkingText = ""
                                         activeAssistantMessage = ""
                                         isStreaming = false
                                     }
                                 }
                             } catch (e: Throwable) {
-                                Log.e("ZeroCopyInfer", "Error during smartphone streaming inference", e)
+                                Log.e("ZeroCopyInfer", "Error during CoT inference", e)
                                 withContext(Dispatchers.Main) {
                                     chatMessages.add(ChatMessage(sender = "assistant", text = "[Error]: ${e.localizedMessage}"))
+                                    activeThinkingText = ""
                                     activeAssistantMessage = ""
                                     isStreaming = false
                                 }
@@ -253,26 +281,74 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
 @Composable
 fun ChatBubble(msg: ChatMessage) {
     val isUser = msg.sender == "user"
+    var isThinkingExpanded by remember { mutableStateOf(true) }
+
     Box(
         modifier = Modifier.fillMaxWidth(),
         contentAlignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
     ) {
-        Surface(
-            color = if (isUser) Color(0xFF1F6FEB) else Color(0xFF21262D),
-            shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomStart = if (isUser) 16.dp else 4.dp,
-                bottomEnd = if (isUser) 4.dp else 16.dp
-            ),
-            modifier = Modifier.widthIn(max = 280.dp)
-        ) {
-            Text(
-                text = msg.text,
-                color = Color.White,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-            )
+        Column(modifier = Modifier.widthIn(max = 300.dp)) {
+            // Render Reasoning Accordion Card if thinkingText exists
+            if (!isUser && msg.thinkingText.isNotBlank()) {
+                Surface(
+                    color = Color(0xFF161B22),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.dp)
+                        .border(1.dp, Color(0xFFD29922).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable { isThinkingExpanded = !isThinkingExpanded }
+                        ) {
+                            Text(
+                                text = "🧠 Pensamiento Kimi-K3 (<|open|>)",
+                                color = Color(0xFFD29922),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.weight(1f))
+                            Icon(
+                                imageVector = if (isThinkingExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Toggle",
+                                tint = Color(0xFFD29922)
+                            )
+                        }
+
+                        AnimatedVisibility(visible = isThinkingExpanded) {
+                            Text(
+                                text = msg.thinkingText,
+                                color = Color(0xFF8B949E),
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier.padding(top = 6.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Render Final Text Bubble
+            if (msg.text.isNotBlank() || isUser) {
+                Surface(
+                    color = if (isUser) Color(0xFF1F6FEB) else Color(0xFF21262D),
+                    shape = RoundedCornerShape(
+                        topStart = 16.dp,
+                        topEnd = 16.dp,
+                        bottomStart = if (isUser) 16.dp else 4.dp,
+                        bottomEnd = if (isUser) 4.dp else 16.dp
+                    )
+                ) {
+                    Text(
+                        text = msg.text,
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                    )
+                }
+            }
         }
     }
 }
