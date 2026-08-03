@@ -1,0 +1,2 @@
+ninja: Entering directory `C:\zerocopy-infer\android\AndroidProject\app\.cxx\Debug\716v2y6g\x86_64'
+ninja: no work to do.

@@ -1,0 +1,27 @@
+{
+  "buildFiles": [
+    "C:\\zerocopy-infer\\android\\AndroidProject\\app\\src\\main\\cpp\\CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "C:\\Users\\timbe\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+      "-C",
+      "C:\\zerocopy-infer\\android\\AndroidProject\\app\\.cxx\\Debug\\716v2y6g\\x86_64",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "C:\\Users\\timbe\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+    "-C",
+    "C:\\zerocopy-infer\\android\\AndroidProject\\app\\.cxx\\Debug\\716v2y6g\\x86_64",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "zerocopy_infer::@6890427a1f51a3e7e1df": {
+      "artifactName": "zerocopy_infer",
+      "abi": "x86_64",
+      "output": "C:\\zerocopy-infer\\android\\AndroidProject\\app\\build\\intermediates\\cxx\\Debug\\716v2y6g\\obj\\x86_64\\libzerocopy_infer.so",
+      "runtimeFiles": []
+    }
+  }
+}

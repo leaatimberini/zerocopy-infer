@@ -1,0 +1,119 @@
+[
+  {
+    "level_": 0,
+    "message_": "Start JSON generation. Platform version: 26 min SDK version: x86_64",
+    "file_": "C:\\zerocopy-infer\\android\\AndroidProject\\app\\src\\main\\cpp\\CMakeLists.txt",
+    "tag_": "debug|x86_64",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "rebuilding JSON C:\\zerocopy-infer\\android\\AndroidProject\\app\\.cxx\\Debug\\20h1373m\\x86_64\\android_gradle_build.json due to:",
+    "file_": "C:\\zerocopy-infer\\android\\AndroidProject\\app\\src\\main\\cpp\\CMakeLists.txt",
+    "tag_": "debug|x86_64",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "- no fingerprint file, will remove stale configuration folder",
+    "file_": "C:\\zerocopy-infer\\android\\AndroidProject\\app\\src\\main\\cpp\\CMakeLists.txt",
+    "tag_": "debug|x86_64",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "removing stale contents from \u0027C:\\zerocopy-infer\\android\\AndroidProject\\app\\.cxx\\Debug\\20h1373m\\x86_64\u0027",
+    "file_": "C:\\zerocopy-infer\\android\\AndroidProject\\app\\src\\main\\cpp\\CMakeLists.txt",
+    "tag_": "debug|x86_64",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "created folder \u0027C:\\zerocopy-infer\\android\\AndroidProject\\app\\.cxx\\Debug\\20h1373m\\x86_64\u0027",
+    "file_": "C:\\zerocopy-infer\\android\\AndroidProject\\app\\src\\main\\cpp\\CMakeLists.txt",
+    "tag_": "debug|x86_64",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "executing cmake @echo off\n\"C:\\\\Users\\\\timbe\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\cmake\\\\3.22.1\\\\bin\\\\cmake.exe\" ^\n  \"-HC:\\\\zerocopy-infer\\\\android\\\\AndroidProject\\\\app\\\\src\\\\main\\\\cpp\" ^\n  \"-DCMAKE_SYSTEM_NAME\u003dAndroid\" ^\n  \"-DCMAKE_EXPORT_COMPILE_COMMANDS\u003dON\" ^\n  \"-DCMAKE_SYSTEM_VERSION\u003d26\" ^\n  \"-DANDROID_PLATFORM\u003dandroid-26\" ^\n  \"-DANDROID_ABI\u003dx86_64\" ^\n  \"-DCMAKE_ANDROID_ARCH_ABI\u003dx86_64\" ^\n  \"-DANDROID_NDK\u003dC:\\\\Users\\\\timbe\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\ndk\\\\28.2.13676358\" ^\n  \"-DCMAKE_ANDROID_NDK\u003dC:\\\\Users\\\\timbe\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\ndk\\\\28.2.13676358\" ^\n  \"-DCMAKE_TOOLCHAIN_FILE\u003dC:\\\\Users\\\\timbe\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\ndk\\\\28.2.13676358\\\\build\\\\cmake\\\\android.toolchain.cmake\" ^\n  \"-DCMAKE_MAKE_PROGRAM\u003dC:\\\\Users\\\\timbe\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\cmake\\\\3.22.1\\\\bin\\\\ninja.exe\" ^\n  \"-DCMAKE_CXX_FLAGS\u003d-std\u003dc++23 -O3 -flto -march\u003darmv8-a+simd\" ^\n  \"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY\u003dC:\\\\zerocopy-infer\\\\android\\\\AndroidProject\\\\app\\\\build\\\\intermediates\\\\cxx\\\\Debug\\\\20h1373m\\\\obj\\\\x86_64\" ^\n  \"-DCMAKE_RUNTIME_OUTPUT_DIRECTORY\u003dC:\\\\zerocopy-infer\\\\android\\\\AndroidProject\\\\app\\\\build\\\\intermediates\\\\cxx\\\\Debug\\\\20h1373m\\\\obj\\\\x86_64\" ^\n  \"-DCMAKE_BUILD_TYPE\u003dDebug\" ^\n  \"-BC:\\\\zerocopy-infer\\\\android\\\\AndroidProject\\\\app\\\\.cxx\\\\Debug\\\\20h1373m\\\\x86_64\" ^\n  -GNinja ^\n  \"-DANDROID_STL\u003dc++_shared\"\n",
+    "file_": "C:\\zerocopy-infer\\android\\AndroidProject\\app\\src\\main\\cpp\\CMakeLists.txt",
+    "tag_": "debug|x86_64",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "@echo off\n\"C:\\\\Users\\\\timbe\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\cmake\\\\3.22.1\\\\bin\\\\cmake.exe\" ^\n  \"-HC:\\\\zerocopy-infer\\\\android\\\\AndroidProject\\\\app\\\\src\\\\main\\\\cpp\" ^\n  \"-DCMAKE_SYSTEM_NAME\u003dAndroid\" ^\n  \"-DCMAKE_EXPORT_COMPILE_COMMANDS\u003dON\" ^\n  \"-DCMAKE_SYSTEM_VERSION\u003d26\" ^\n  \"-DANDROID_PLATFORM\u003dandroid-26\" ^\n  \"-DANDROID_ABI\u003dx86_64\" ^\n  \"-DCMAKE_ANDROID_ARCH_ABI\u003dx86_64\" ^\n  \"-DANDROID_NDK\u003dC:\\\\Users\\\\timbe\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\ndk\\\\28.2.13676358\" ^\n  \"-DCMAKE_ANDROID_NDK\u003dC:\\\\Users\\\\timbe\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\ndk\\\\28.2.13676358\" ^\n  \"-DCMAKE_TOOLCHAIN_FILE\u003dC:\\\\Users\\\\timbe\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\ndk\\\\28.2.13676358\\\\build\\\\cmake\\\\android.toolchain.cmake\" ^\n  \"-DCMAKE_MAKE_PROGRAM\u003dC:\\\\Users\\\\timbe\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\cmake\\\\3.22.1\\\\bin\\\\ninja.exe\" ^\n  \"-DCMAKE_CXX_FLAGS\u003d-std\u003dc++23 -O3 -flto -march\u003darmv8-a+simd\" ^\n  \"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY\u003dC:\\\\zerocopy-infer\\\\android\\\\AndroidProject\\\\app\\\\build\\\\intermediates\\\\cxx\\\\Debug\\\\20h1373m\\\\obj\\\\x86_64\" ^\n  \"-DCMAKE_RUNTIME_OUTPUT_DIRECTORY\u003dC:\\\\zerocopy-infer\\\\android\\\\AndroidProject\\\\app\\\\build\\\\intermediates\\\\cxx\\\\Debug\\\\20h1373m\\\\obj\\\\x86_64\" ^\n  \"-DCMAKE_BUILD_TYPE\u003dDebug\" ^\n  \"-BC:\\\\zerocopy-infer\\\\android\\\\AndroidProject\\\\app\\\\.cxx\\\\Debug\\\\20h1373m\\\\x86_64\" ^\n  -GNinja ^\n  \"-DANDROID_STL\u003dc++_shared\"\n",
+    "file_": "C:\\zerocopy-infer\\android\\AndroidProject\\app\\src\\main\\cpp\\CMakeLists.txt",
+    "tag_": "debug|x86_64",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "Received process result: 1",
+    "file_": "C:\\zerocopy-infer\\android\\AndroidProject\\app\\src\\main\\cpp\\CMakeLists.txt",
+    "tag_": "debug|x86_64",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "JSON generation completed with problem. Exception: com.android.ide.common.process.ProcessException: -- The C compiler identification is Clang 19.0.1\n-- The CXX compiler identification is Clang 19.0.1\n-- Detecting C compiler ABI info\n-- Detecting C compiler ABI info - done\n-- Check for working C compiler: C:/Users/timbe/AppData/Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/clang.exe - skipped\n-- Detecting C compile features\n-- Detecting C compile features - done\n-- Detecting CXX compiler ABI info\n-- Detecting CXX compiler ABI info - failed\n-- Check for working CXX compiler: C:/Users/timbe/AppData/Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/clang++.exe\n-- Check for working CXX compiler: C:/Users/timbe/AppData/Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/clang++.exe - broken\n-- Configuring incomplete, errors occurred!\nSee also \"C:/zerocopy-infer/android/AndroidProject/app/.cxx/Debug/20h1373m/x86_64/CMakeFiles/CMakeOutput.log\".\nSee also \"C:/zerocopy-infer/android/AndroidProject/app/.cxx/Debug/20h1373m/x86_64/CMakeFiles/CMakeError.log\".\n\nC++ build system [configure] failed while executing:\n    @echo off\n    \"C:\\\\Users\\\\timbe\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\cmake\\\\3.22.1\\\\bin\\\\cmake.exe\" ^\n      \"-HC:\\\\zerocopy-infer\\\\android\\\\AndroidProject\\\\app\\\\src\\\\main\\\\cpp\" ^\n      \"-DCMAKE_SYSTEM_NAME\u003dAndroid\" ^\n      \"-DCMAKE_EXPORT_COMPILE_COMMANDS\u003dON\" ^\n      \"-DCMAKE_SYSTEM_VERSION\u003d26\" ^\n      \"-DANDROID_PLATFORM\u003dandroid-26\" ^\n      \"-DANDROID_ABI\u003dx86_64\" ^\n      \"-DCMAKE_ANDROID_ARCH_ABI\u003dx86_64\" ^\n      \"-DANDROID_NDK\u003dC:\\\\Users\\\\timbe\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\ndk\\\\28.2.13676358\" ^\n      \"-DCMAKE_ANDROID_NDK\u003dC:\\\\Users\\\\timbe\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\ndk\\\\28.2.13676358\" ^\n      \"-DCMAKE_TOOLCHAIN_FILE\u003dC:\\\\Users\\\\timbe\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\ndk\\\\28.2.13676358\\\\build\\\\cmake\\\\android.toolchain.cmake\" ^\n      \"-DCMAKE_MAKE_PROGRAM\u003dC:\\\\Users\\\\timbe\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\cmake\\\\3.22.1\\\\bin\\\\ninja.exe\" ^\n      \"-DCMAKE_CXX_FLAGS\u003d-std\u003dc++23 -O3 -flto -march\u003darmv8-a+simd\" ^\n      \"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY\u003dC:\\\\zerocopy-infer\\\\android\\\\AndroidProject\\\\app\\\\build\\\\intermediates\\\\cxx\\\\Debug\\\\20h1373m\\\\obj\\\\x86_64\" ^\n      \"-DCMAKE_RUNTIME_OUTPUT_DIRECTORY\u003dC:\\\\zerocopy-infer\\\\android\\\\AndroidProject\\\\app\\\\build\\\\intermediates\\\\cxx\\\\Debug\\\\20h1373m\\\\obj\\\\x86_64\" ^\n      \"-DCMAKE_BUILD_TYPE\u003dDebug\" ^\n      \"-BC:\\\\zerocopy-infer\\\\android\\\\AndroidProject\\\\app\\\\.cxx\\\\Debug\\\\20h1373m\\\\x86_64\" ^\n      -GNinja ^\n      \"-DANDROID_STL\u003dc++_shared\"\n  from C:\\zerocopy-infer\\android\\AndroidProject\\app\nCMake Error at C:/Users/timbe/AppData/Local/Android/Sdk/cmake/3.22.1/share/cmake-3.22/Modules/CMakeTestCXXCompiler.cmake:62 (message):\n  The C++ compiler\n\n    \"C:/Users/timbe/AppData/Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/clang++.exe\"\n\n  is not able to compile a simple test program.\n\n  It fails with the following output:\n\n    Change Dir: C:/zerocopy-infer/android/AndroidProject/app/.cxx/Debug/20h1373m/x86_64/CMakeFiles/CMakeTmp\n    \n    Run Build Command(s):C:\\Users\\timbe\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe cmTC_a82c4 \u0026\u0026 [1/2] Building CXX object CMakeFiles/cmTC_a82c4.dir/testCXXCompiler.cxx.o\r\n    FAILED: CMakeFiles/cmTC_a82c4.dir/testCXXCompiler.cxx.o \r\n    C:\\Users\\timbe\\AppData\\Local\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target\u003dx86_64-none-linux-android26 --sysroot\u003dC:/Users/timbe/AppData/Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot   -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE\u003d2 -Wformat -Werror\u003dformat-security  -std\u003dc++23 -O3 -flto -march\u003darmv8-a+simd  -fPIE -MD -MT CMakeFiles/cmTC_a82c4.dir/testCXXCompiler.cxx.o -MF CMakeFiles\\cmTC_a82c4.dir\\testCXXCompiler.cxx.o.d -o CMakeFiles/cmTC_a82c4.dir/testCXXCompiler.cxx.o -c C:/zerocopy-infer/android/AndroidProject/app/.cxx/Debug/20h1373m/x86_64/CMakeFiles/CMakeTmp/testCXXCompiler.cxx\r\n    error: unknown target CPU \u0027armv8-a+simd\u0027\r\n    note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, x86-64, x86-64-v2, x86-64-v3, x86-64-v4\r\n    ninja: build stopped: subcommand failed.\r\n    \n    \n\n  \n\n  CMake will not be able to correctly generate this project.\nCall Stack (most recent call first):\n  CMakeLists.txt:2 (project)",
+    "file_": "C:\\zerocopy-infer\\android\\AndroidProject\\app\\src\\main\\cpp\\CMakeLists.txt",
+    "tag_": "debug|x86_64",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  }
+]

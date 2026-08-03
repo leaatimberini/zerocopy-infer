@@ -1,0 +1,27 @@
+CMake Error at C:/Users/timbe/AppData/Local/Android/Sdk/cmake/3.22.1/share/cmake-3.22/Modules/CMakeTestCXXCompiler.cmake:62 (message):
+  The C++ compiler
+
+    "C:/Users/timbe/AppData/Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/clang++.exe"
+
+  is not able to compile a simple test program.
+
+  It fails with the following output:
+
+    Change Dir: C:/zerocopy-infer/android/AndroidProject/app/.cxx/Debug/20h1373m/x86_64/CMakeFiles/CMakeTmp
+    
+    Run Build Command(s):C:\Users\timbe\AppData\Local\Android\Sdk\cmake\3.22.1\bin\ninja.exe cmTC_a82c4 && [1/2] Building CXX object CMakeFiles/cmTC_a82c4.dir/testCXXCompiler.cxx.o
+    FAILED: CMakeFiles/cmTC_a82c4.dir/testCXXCompiler.cxx.o 
+    C:\Users\timbe\AppData\Local\Android\Sdk\ndk\28.2.13676358\toolchains\llvm\prebuilt\windows-x86_64\bin\clang++.exe --target=x86_64-none-linux-android26 --sysroot=C:/Users/timbe/AppData/Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot   -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++23 -O3 -flto -march=armv8-a+simd  -fPIE -MD -MT CMakeFiles/cmTC_a82c4.dir/testCXXCompiler.cxx.o -MF CMakeFiles\cmTC_a82c4.dir\testCXXCompiler.cxx.o.d -o CMakeFiles/cmTC_a82c4.dir/testCXXCompiler.cxx.o -c C:/zerocopy-infer/android/AndroidProject/app/.cxx/Debug/20h1373m/x86_64/CMakeFiles/CMakeTmp/testCXXCompiler.cxx
+    error: unknown target CPU 'armv8-a+simd'
+    note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+    ninja: build stopped: subcommand failed.
+    
+    
+
+  
+
+  CMake will not be able to correctly generate this project.
+Call Stack (most recent call first):
+  CMakeLists.txt:2 (project)
+
+

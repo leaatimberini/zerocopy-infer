@@ -1,0 +1,3 @@
+C:/zerocopy-infer/android/AndroidProject/app/.cxx/Debug/716v2y6g/arm64-v8a/CMakeFiles/zerocopy_infer.dir
+C:/zerocopy-infer/android/AndroidProject/app/.cxx/Debug/716v2y6g/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/zerocopy-infer/android/AndroidProject/app/.cxx/Debug/716v2y6g/arm64-v8a/CMakeFiles/rebuild_cache.dir

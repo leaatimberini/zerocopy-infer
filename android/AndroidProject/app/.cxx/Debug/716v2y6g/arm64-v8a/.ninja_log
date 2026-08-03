@@ -1,0 +1,3 @@
+# ninja log v5
+0	666	8074773170803629	CMakeFiles/zerocopy_infer.dir/zerocopy_infer_jni.cpp.o	2aaba5fdbc904ed6
+668	850	8074773172617840	C:/zerocopy-infer/android/AndroidProject/app/build/intermediates/cxx/Debug/716v2y6g/obj/arm64-v8a/libzerocopy_infer.so	4bd1d43029e50e3c

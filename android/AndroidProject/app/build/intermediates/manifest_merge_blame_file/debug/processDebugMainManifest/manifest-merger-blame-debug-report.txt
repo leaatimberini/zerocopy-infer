@@ -16,22 +16,22 @@
 12-->C:\zerocopy-infer\android\AndroidProject\app\src\main\AndroidManifest.xml:6:22-76
 13
 14    <permission
-14-->[androidx.core:core:1.12.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\183e9401516b3027fe709169a16b926d\transformed\core-1.12.0\AndroidManifest.xml:22:5-24:47
+14-->[androidx.core:core:1.12.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\594d574e574676baaa5d3c7f8452f5c1\workspace\transformed\core-1.12.0\AndroidManifest.xml:22:5-24:47
 15        android:name="com.zerocopy.infer.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
-15-->[androidx.core:core:1.12.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\183e9401516b3027fe709169a16b926d\transformed\core-1.12.0\AndroidManifest.xml:23:9-81
+15-->[androidx.core:core:1.12.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\594d574e574676baaa5d3c7f8452f5c1\workspace\transformed\core-1.12.0\AndroidManifest.xml:23:9-81
 16        android:protectionLevel="signature" />
-16-->[androidx.core:core:1.12.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\183e9401516b3027fe709169a16b926d\transformed\core-1.12.0\AndroidManifest.xml:24:9-44
+16-->[androidx.core:core:1.12.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\594d574e574676baaa5d3c7f8452f5c1\workspace\transformed\core-1.12.0\AndroidManifest.xml:24:9-44
 17
 18    <uses-permission android:name="com.zerocopy.infer.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
-18-->[androidx.core:core:1.12.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\183e9401516b3027fe709169a16b926d\transformed\core-1.12.0\AndroidManifest.xml:26:5-97
-18-->[androidx.core:core:1.12.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\183e9401516b3027fe709169a16b926d\transformed\core-1.12.0\AndroidManifest.xml:26:22-94
+18-->[androidx.core:core:1.12.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\594d574e574676baaa5d3c7f8452f5c1\workspace\transformed\core-1.12.0\AndroidManifest.xml:26:5-97
+18-->[androidx.core:core:1.12.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\594d574e574676baaa5d3c7f8452f5c1\workspace\transformed\core-1.12.0\AndroidManifest.xml:26:22-94
 19
 20    <application
 20-->C:\zerocopy-infer\android\AndroidProject\app\src\main\AndroidManifest.xml:8:5-24:19
 21        android:allowBackup="true"
 21-->C:\zerocopy-infer\android\AndroidProject\app\src\main\AndroidManifest.xml:9:9-35
 22        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
-22-->[androidx.core:core:1.12.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\183e9401516b3027fe709169a16b926d\transformed\core-1.12.0\AndroidManifest.xml:28:18-86
+22-->[androidx.core:core:1.12.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\594d574e574676baaa5d3c7f8452f5c1\workspace\transformed\core-1.12.0\AndroidManifest.xml:28:18-86
 23        android:debuggable="true"
 24        android:extractNativeLibs="false"
 25        android:label="@string/app_name"
@@ -61,68 +61,68 @@
 37        </activity>
 38
 39        <provider
-39-->[androidx.emoji2:emoji2:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\648fb9867fe79fec310b623e708b5a10\transformed\emoji2-1.3.0\AndroidManifest.xml:24:9-32:20
+39-->[androidx.emoji2:emoji2:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\71cba9578c1201ffc2eba4521ea825f1\workspace\transformed\emoji2-1.3.0\AndroidManifest.xml:24:9-32:20
 40            android:name="androidx.startup.InitializationProvider"
-40-->[androidx.emoji2:emoji2:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\648fb9867fe79fec310b623e708b5a10\transformed\emoji2-1.3.0\AndroidManifest.xml:25:13-67
+40-->[androidx.emoji2:emoji2:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\71cba9578c1201ffc2eba4521ea825f1\workspace\transformed\emoji2-1.3.0\AndroidManifest.xml:25:13-67
 41            android:authorities="com.zerocopy.infer.androidx-startup"
-41-->[androidx.emoji2:emoji2:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\648fb9867fe79fec310b623e708b5a10\transformed\emoji2-1.3.0\AndroidManifest.xml:26:13-68
+41-->[androidx.emoji2:emoji2:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\71cba9578c1201ffc2eba4521ea825f1\workspace\transformed\emoji2-1.3.0\AndroidManifest.xml:26:13-68
 42            android:exported="false" >
-42-->[androidx.emoji2:emoji2:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\648fb9867fe79fec310b623e708b5a10\transformed\emoji2-1.3.0\AndroidManifest.xml:27:13-37
+42-->[androidx.emoji2:emoji2:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\71cba9578c1201ffc2eba4521ea825f1\workspace\transformed\emoji2-1.3.0\AndroidManifest.xml:27:13-37
 43            <meta-data
-43-->[androidx.emoji2:emoji2:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\648fb9867fe79fec310b623e708b5a10\transformed\emoji2-1.3.0\AndroidManifest.xml:29:13-31:52
+43-->[androidx.emoji2:emoji2:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\71cba9578c1201ffc2eba4521ea825f1\workspace\transformed\emoji2-1.3.0\AndroidManifest.xml:29:13-31:52
 44                android:name="androidx.emoji2.text.EmojiCompatInitializer"
-44-->[androidx.emoji2:emoji2:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\648fb9867fe79fec310b623e708b5a10\transformed\emoji2-1.3.0\AndroidManifest.xml:30:17-75
+44-->[androidx.emoji2:emoji2:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\71cba9578c1201ffc2eba4521ea825f1\workspace\transformed\emoji2-1.3.0\AndroidManifest.xml:30:17-75
 45                android:value="androidx.startup" />
-45-->[androidx.emoji2:emoji2:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\648fb9867fe79fec310b623e708b5a10\transformed\emoji2-1.3.0\AndroidManifest.xml:31:17-49
+45-->[androidx.emoji2:emoji2:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\71cba9578c1201ffc2eba4521ea825f1\workspace\transformed\emoji2-1.3.0\AndroidManifest.xml:31:17-49
 46            <meta-data
-46-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\1b07f886a69cc7d81b99c1f6d9ee86ce\transformed\lifecycle-process-2.7.0\AndroidManifest.xml:29:13-31:52
+46-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\1569f4bf17fbf54f92cb19009efab89f\workspace\transformed\lifecycle-process-2.7.0\AndroidManifest.xml:29:13-31:52
 47                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
-47-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\1b07f886a69cc7d81b99c1f6d9ee86ce\transformed\lifecycle-process-2.7.0\AndroidManifest.xml:30:17-78
+47-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\1569f4bf17fbf54f92cb19009efab89f\workspace\transformed\lifecycle-process-2.7.0\AndroidManifest.xml:30:17-78
 48                android:value="androidx.startup" />
-48-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\1b07f886a69cc7d81b99c1f6d9ee86ce\transformed\lifecycle-process-2.7.0\AndroidManifest.xml:31:17-49
+48-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\1569f4bf17fbf54f92cb19009efab89f\workspace\transformed\lifecycle-process-2.7.0\AndroidManifest.xml:31:17-49
 49            <meta-data
-49-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:29:13-31:52
+49-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:29:13-31:52
 50                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
-50-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:30:17-85
+50-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:30:17-85
 51                android:value="androidx.startup" />
-51-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:31:17-49
+51-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:31:17-49
 52        </provider>
 53
 54        <receiver
-54-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:34:9-52:20
+54-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:34:9-52:20
 55            android:name="androidx.profileinstaller.ProfileInstallReceiver"
-55-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:35:13-76
+55-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:35:13-76
 56            android:directBootAware="false"
-56-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:36:13-44
+56-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:36:13-44
 57            android:enabled="true"
-57-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:37:13-35
+57-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:37:13-35
 58            android:exported="true"
-58-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:38:13-36
+58-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:38:13-36
 59            android:permission="android.permission.DUMP" >
-59-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:39:13-57
+59-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:39:13-57
 60            <intent-filter>
-60-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:40:13-42:29
+60-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:40:13-42:29
 61                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
-61-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:41:17-91
-61-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:41:25-88
+61-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:41:17-91
+61-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:41:25-88
 62            </intent-filter>
 63            <intent-filter>
-63-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:43:13-45:29
+63-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:43:13-45:29
 64                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
-64-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:44:17-85
-64-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:44:25-82
+64-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:44:17-85
+64-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:44:25-82
 65            </intent-filter>
 66            <intent-filter>
-66-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:46:13-48:29
+66-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:46:13-48:29
 67                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
-67-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:47:17-88
-67-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:47:25-85
+67-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:47:17-88
+67-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:47:25-85
 68            </intent-filter>
 69            <intent-filter>
-69-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:49:13-51:29
+69-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:49:13-51:29
 70                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
-70-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:50:17-95
-70-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.0-milestone-1\transforms\6da1216e52a1f6410d7634f9dd1ed7c6\transformed\profileinstaller-1.3.0\AndroidManifest.xml:50:25-92
+70-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:50:17-95
+70-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\timbe\.gradle\caches\9.1.0\transforms\84b108e00a8e42013a6ecbcde5af2d7e\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:50:25-92
 71            </intent-filter>
 72        </receiver>
 73    </application>

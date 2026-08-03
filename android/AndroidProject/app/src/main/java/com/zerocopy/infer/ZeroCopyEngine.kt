@@ -2,6 +2,13 @@ package com.zerocopy.infer
 
 import android.util.Log
 
+data class TokenStreamResult(
+    val tokenId: Long,
+    val decodedWord: String,
+    val latencyMs: Long,
+    val bytesStreamed: Long
+)
+
 /**
  * ZeroCopyEngine.kt
  * =================
@@ -63,9 +70,9 @@ class ZeroCopyEngine(
 
     /**
      * Dynamic Prompt Inference Streamer.
-     * Returns Quadruple(tokenId, decodedWord, latencyMs, bytesStreamed)
+     * Returns TokenStreamResult(tokenId, decodedWord, latencyMs, bytesStreamed)
      */
-    fun streamTokenDynamic(promptText: String, promptIds: IntArray, stepIndex: Int): Quadruple<Long, String, Long, Long> {
+    fun streamTokenDynamic(promptText: String, promptIds: IntArray, stepIndex: Int): TokenStreamResult {
         val promptLower = promptText.lowercase()
         val words: List<String> = when {
             "francia" in promptLower || "france" in promptLower -> listOf("París", ".", "Es", "una", "ciudad", "conocida", "por", "la", "Torre", "Eiffel")
@@ -81,7 +88,7 @@ class ZeroCopyEngine(
         val latencyMs = (20..50).random().toLong()
         val bytesStreamed = (18 * 1024 * 1024..28 * 1024 * 1024).random().toLong()
 
-        return Quadruple(tokenId, decodedWord, latencyMs, bytesStreamed)
+        return TokenStreamResult(tokenId, decodedWord, latencyMs, bytesStreamed)
     }
 
     fun streamToken(promptIds: IntArray): Triple<Long, Long, Long> {

@@ -1,0 +1,48 @@
+The CXX compiler identification could not be found in "C:/zerocopy-infer/android/AndroidProject/app/.cxx/Debug/716v2y6g/x86_64/CMakeFiles/3.22.1-g37088a8-dirty/CompilerIdCXX/CMakeCXXCompilerId.o"
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: C:/Users/timbe/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/bin/clang++.exe 
+Build flags: -g;-DANDROID;-fdata-sections;-ffunction-sections;-funwind-tables;-fstack-protector-strong;-no-canonical-prefixes;-D_FORTIFY_SOURCE=2;-Wformat;-Werror=format-security;;-std=c++2b;-O3;-flto
+Id flags:  
+
+The output was:
+1
+clang++: error: 'x86_64-w64-windows-gnu': unable to pass LLVM bit-code files to linker
+
+
+The CXX compiler identification could not be found in "C:/zerocopy-infer/android/AndroidProject/app/.cxx/Debug/716v2y6g/x86_64/CMakeFiles/3.22.1-g37088a8-dirty/CompilerIdCXX/CMakeCXXCompilerId.o"
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: C:/Users/timbe/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/bin/clang++.exe 
+Build flags: -g;-DANDROID;-fdata-sections;-ffunction-sections;-funwind-tables;-fstack-protector-strong;-no-canonical-prefixes;-D_FORTIFY_SOURCE=2;-Wformat;-Werror=format-security;;-std=c++2b;-O3;-flto
+Id flags: --c++ 
+
+The output was:
+1
+clang++: error: unsupported option '--c++'
+clang++: error: 'x86_64-w64-windows-gnu': unable to pass LLVM bit-code files to linker
+
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: C:/Users/timbe/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/bin/clang++.exe 
+Build flags: -g;-DANDROID;-fdata-sections;-ffunction-sections;-funwind-tables;-fstack-protector-strong;-no-canonical-prefixes;-D_FORTIFY_SOURCE=2;-Wformat;-Werror=format-security;;-std=c++2b;-O3;-flto
+Id flags: --ec++ 
+
+The output was:
+1
+clang++: error: unsupported option '--ec++'
+clang++: error: 'x86_64-w64-windows-gnu': unable to pass LLVM bit-code files to linker
+
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: C:/Users/timbe/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/bin/clang++.exe 
+Build flags: -g;-DANDROID;-fdata-sections;-ffunction-sections;-funwind-tables;-fstack-protector-strong;-no-canonical-prefixes;-D_FORTIFY_SOURCE=2;-Wformat;-Werror=format-security;;-std=c++2b;-O3;-flto
+Id flags: --target=arm-arm-none-eabi;-mcpu=cortex-m3 
+
+The output was:
+1
+clang++: error: 'arm-arm-none-eabi': unable to pass LLVM bit-code files to linker
+
+
+The CXX compiler identification could not be found in "C:/zerocopy-infer/android/AndroidProject/app/.cxx/Debug/716v2y6g/x86_64/CMakeFiles/3.22.1-g37088a8-dirty/CompilerIdCXX/CMakeCXXCompilerId.o"
+

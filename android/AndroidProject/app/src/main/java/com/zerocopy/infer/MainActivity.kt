@@ -126,14 +126,14 @@ fun ZeroCopyDashboard(engine: ZeroCopyEngine) {
                             sb.append("--------------------------------------------------\n")
                             
                             for (i in 1..numTokens) {
-                                val (tokenId, decodedWord, latencyMs, bytesStreamed) = engine.streamTokenDynamic(promptText, promptIds, i)
-                                val mbStreamed = bytesStreamed.toDouble() / (1024 * 1024)
+                                val res = engine.streamTokenDynamic(promptText, promptIds, i)
+                                val mbStreamed = res.bytesStreamed.toDouble() / (1024 * 1024)
                                 
-                                val stepInfo = "Token [$i/$numTokens] -> Word: '$decodedWord' (ID: $tokenId) | Latency: ${latencyMs}ms | Streamed: %.2f MB\n".format(mbStreamed)
+                                val stepInfo = "Token [$i/$numTokens] -> Word: '${res.decodedWord}' (ID: ${res.tokenId}) | Latency: ${res.latencyMs}ms | Streamed: %.2f MB\n".format(mbStreamed)
                                 Log.d("ZeroCopyInfer", stepInfo)
                                 
                                 withContext(Dispatchers.Main) {
-                                    generatedResponse += "$decodedWord "
+                                    generatedResponse += "${res.decodedWord} "
                                     outputLog = sb.append(stepInfo).toString()
                                 }
                             }

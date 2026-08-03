@@ -12,13 +12,13 @@ android {
         minSdk = 26
         targetSdk = 34
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "0.1.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
         externalNativeBuild {
             cmake {
-                cppFlags("-std=c++23 -O3 -flto -march=armv8-a+simd")
+                cppFlags("-std=c++2b -O3 -flto")
                 arguments("-DANDROID_STL=c++_shared")
             }
         }
