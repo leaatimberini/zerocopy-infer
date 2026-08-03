@@ -192,7 +192,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                             try {
                                 withContext(Dispatchers.IO) {
                                     val promptIds = prompt.split(" ").map { it.hashCode() and 0xFFFF }.toIntArray()
-                                    val numTokens = 15
+                                    val numTokens = engine.getWordCountForPrompt(prompt)
                                     var currentText = ""
 
                                     for (i in 1..numTokens) {
