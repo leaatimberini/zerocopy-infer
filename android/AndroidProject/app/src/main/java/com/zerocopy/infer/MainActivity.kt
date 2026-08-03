@@ -6,15 +6,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,7 +45,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = Color(0xFF0D1117)
                 ) {
-                    ZeroCopyDashboard(engine)
+                    ZeroCopyChatInterface(engine)
                 }
             }
         }
@@ -51,153 +53,214 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun ZeroCopyDashboard(engine: ZeroCopyEngine) {
-    var promptText by remember { mutableStateOf("La velocidad de la luz es") }
-    var generatedResponse by remember { mutableStateOf("") }
-    var outputLog by remember { mutableStateOf("Ready for Zero-Disk Cloud Streaming Inference.\nType any prompt and click 'Execute Cloud Stream Inference'.") }
+fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
+    var inputText by remember { mutableStateOf("") }
+    val chatMessages = remember { mutableStateListOf<ChatMessage>() }
     var isStreaming by remember { mutableStateOf(false) }
+    var activeAssistantMessage by remember { mutableStateOf("") }
     
+    val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    val scrollState = rememberScrollState()
+
+    LaunchedEffect(chatMessages.size, activeAssistantMessage) {
+        if (chatMessages.isNotEmpty() || activeAssistantMessage.isNotEmpty()) {
+            listState.animateScrollToItem((chatMessages.size + if (isStreaming) 1 else 0).coerceAtLeast(0))
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .background(Color(0xFF0D1117))
     ) {
-        Text(
-            text = "ZeroCopy-Infer Android",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF58A6FF)
-        )
-        Text(
-            text = "Cloud-Native MoE Engine • Leandro Timberini",
-            fontSize = 12.sp,
-            color = Color.Gray,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-            shape = RoundedCornerShape(12.dp)
+        // Header Bar
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = Color(0xFF161B22),
+            shadowElevation = 4.dp
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
-                Text(text = "Target Model: Kimi K3 (2.78 Trillones MoE)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text(text = "Internal SSD Storage Used: 0 Bytes", color = Color(0xFF3FB950), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                Text(text = "RAM Cache Limit: 6.0 GB LPDDR5 RAM", color = Color(0xFFD29922), fontSize = 13.sp)
-            }
-        }
-
-        OutlinedTextField(
-            value = promptText,
-            onValueChange = { promptText = it },
-            label = { Text("Prompt de Usuario") },
-            enabled = !isStreaming,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFF58A6FF),
-                unfocusedBorderColor = Color.Gray,
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White
-            )
-        )
-
-        Button(
-            onClick = {
-                if (isStreaming || promptText.isBlank()) return@Button
-                isStreaming = true
-                generatedResponse = promptText + " "
-                outputLog = "Starting Cloud HTTP Range Stream for Kimi K3...\nPrompt: '$promptText'\n"
-                
-                scope.launch {
-                    try {
-                        withContext(Dispatchers.IO) {
-                            val promptIds = promptText.split(" ").map { it.hashCode() and 0xFFFF }.toIntArray()
-                            val numTokens = 10
-                            
-                            val sb = StringBuilder(outputLog)
-                            sb.append("--------------------------------------------------\n")
-                            
-                            for (i in 1..numTokens) {
-                                val res = engine.streamTokenDynamic(promptText, promptIds, i)
-                                val mbStreamed = res.bytesStreamed.toDouble() / (1024 * 1024)
-                                
-                                val stepInfo = "Token [$i/$numTokens] -> Word: '${res.decodedWord}' (ID: ${res.tokenId}) | Latency: ${res.latencyMs}ms | Streamed: %.2f MB\n".format(mbStreamed)
-                                Log.d("ZeroCopyInfer", stepInfo)
-                                
-                                withContext(Dispatchers.Main) {
-                                    generatedResponse += "${res.decodedWord} "
-                                    outputLog = sb.append(stepInfo).toString()
-                                }
-                            }
-                            
-                            val finalMsg = "\n==================================================\nSUCCESS: Inference Complete!\nZero Disk Storage Occupied on Smartphone."
-                            withContext(Dispatchers.Main) {
-                                outputLog = sb.append(finalMsg).toString()
-                                isStreaming = false
-                            }
-                        }
-                    } catch (e: Throwable) {
-                        Log.e("ZeroCopyInfer", "Error during streaming inference", e)
-                        withContext(Dispatchers.Main) {
-                            outputLog += "\n[Error] Exception during stream: ${e.localizedMessage}"
-                            isStreaming = false
-                        }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "ZeroCopy-Infer Chat",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF58A6FF)
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    Surface(
+                        color = Color(0xFF238636),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = "0 Bytes SSD",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
                     }
                 }
-            },
-            enabled = !isStreaming,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636))
-        ) {
-            if (isStreaming) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "Streaming Tokens...", color = Color.White)
-                }
-            } else {
-                Text(text = "Execute Cloud Stream Inference", color = Color.White, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "Kimi K3 • Continuous Cloud HTTP Range Stream • Leandro Timberini",
+                    fontSize = 11.sp,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        if (generatedResponse.isNotEmpty()) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1F242C)),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(text = "Generated Response:", color = Color(0xFF58A6FF), fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Text(text = generatedResponse, color = Color.White, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
-                }
-            }
-        }
-
-        Box(
+        // Chat Message Area
+        LazyColumn(
+            state = listState,
             modifier = Modifier
-                .fillMaxWidth()
                 .weight(1f)
-                .background(Color(0xFF010409), shape = RoundedCornerShape(8.dp))
-                .padding(12.dp)
-                .verticalScroll(scrollState)
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (chatMessages.isEmpty() && !isStreaming) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 40.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "¡Hola! Escribe cualquier pregunta para comenzar una conversación fluida con ZeroCopy-Infer.",
+                            color = Color.Gray,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+            }
+
+            items(chatMessages) { msg ->
+                ChatBubble(msg)
+            }
+
+            if (isStreaming) {
+                item {
+                    ChatBubble(ChatMessage(sender = "assistant", text = activeAssistantMessage))
+                }
+            }
+        }
+
+        // Input Bar
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = Color(0xFF161B22),
+            shadowElevation = 8.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(8.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = inputText,
+                    onValueChange = { inputText = it },
+                    placeholder = { Text("Escribe tu mensaje...", color = Color.Gray) },
+                    enabled = !isStreaming,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF58A6FF),
+                        unfocusedBorderColor = Color(0xFF30363D),
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedContainerColor = Color(0xFF0D1117),
+                        unfocusedContainerColor = Color(0xFF0D1117)
+                    )
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                IconButton(
+                    onClick = {
+                        val prompt = inputText.trim()
+                        if (prompt.isEmpty() || isStreaming) return@IconButton
+                        
+                        inputText = ""
+                        chatMessages.add(ChatMessage(sender = "user", text = prompt))
+                        isStreaming = true
+                        activeAssistantMessage = ""
+
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    val promptIds = prompt.split(" ").map { it.hashCode() and 0xFFFF }.toIntArray()
+                                    val numTokens = 15
+                                    var currentText = ""
+
+                                    for (i in 1..numTokens) {
+                                        val res = engine.streamTokenDynamic(prompt, promptIds, i)
+                                        currentText += "${res.decodedWord} "
+
+                                        withContext(Dispatchers.Main) {
+                                            activeAssistantMessage = currentText
+                                        }
+                                    }
+
+                                    withContext(Dispatchers.Main) {
+                                        chatMessages.add(ChatMessage(sender = "assistant", text = currentText.trim()))
+                                        activeAssistantMessage = ""
+                                        isStreaming = false
+                                    }
+                                }
+                            } catch (e: Throwable) {
+                                Log.e("ZeroCopyInfer", "Error in chat streaming", e)
+                                withContext(Dispatchers.Main) {
+                                    chatMessages.add(ChatMessage(sender = "assistant", text = "[Error]: ${e.localizedMessage}"))
+                                    activeAssistantMessage = ""
+                                    isStreaming = false
+                                }
+                            }
+                        }
+                    },
+                    enabled = !isStreaming && inputText.isNotBlank(),
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            color = if (!isStreaming && inputText.isNotBlank()) Color(0xFF1F6FEB) else Color(0xFF30363D),
+                            shape = RoundedCornerShape(24.dp)
+                        )
+                ) {
+                    if (isStreaming) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                    } else {
+                        Icon(imageVector = Icons.Default.Send, contentDescription = "Send", tint = Color.White)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ChatBubble(msg: ChatMessage) {
+    val isUser = msg.sender == "user"
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
+    ) {
+        Surface(
+            color = if (isUser) Color(0xFF1F6FEB) else Color(0xFF21262D),
+            shape = RoundedCornerShape(
+                topStart = 16.dp,
+                topEnd = 16.dp,
+                bottomStart = if (isUser) 16.dp else 4.dp,
+                bottomEnd = if (isUser) 4.dp else 16.dp
+            ),
+            modifier = Modifier.widthIn(max = 280.dp)
         ) {
             Text(
-                text = outputLog,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 11.sp,
-                color = Color(0xFF7EE787)
+                text = msg.text,
+                color = Color.White,
+                fontSize = 14.sp,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
             )
         }
     }
