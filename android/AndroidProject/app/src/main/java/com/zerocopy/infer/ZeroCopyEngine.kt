@@ -246,10 +246,10 @@ class ZeroCopyEngine(
                 val cleanWords = promptText.replace("¿", "").replace("?", "").replace("¡", "").replace("!", "").split(" ")
                     .filter { it.trim().isNotEmpty() }
 
-                val topic = if (cleanWords.isNotEmpty()) cleanWords.last().capitalize(Locale.ROOT) else "este concepto"
+                val topic = if (cleanWords.isNotEmpty()) cleanWords.last().replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() } else "este concepto"
                 
                 listOf(
-                    "El", "análisis", "de", "'$topic'", "comprende", "principios", "fundamentales", "de", "procesamiento", "y", "estructura", ".",
+                    "El", "análisis", "de", topic, "comprende", "principios", "fundamentales", "de", "procesamiento", "y", "estructura", ".",
                     "En", "el", "contexto", "de", "Kimi", "K3", ",", "este", "dominio", "involucra", "relaciones", "semánticas", "avanzadas", ",", "patrones", "de", "información",
                     "y", "evaluación", "lógica", "transmitida", "en", "tiempo", "real", "con", "streaming", "Zero-Disk", "."
                 )
