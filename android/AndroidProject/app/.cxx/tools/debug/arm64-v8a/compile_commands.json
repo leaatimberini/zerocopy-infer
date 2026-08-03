@@ -1,0 +1,7 @@
+[
+{
+  "directory": "C:/zerocopy-infer/android/AndroidProject/app/.cxx/Debug/485t1425/arm64-v8a",
+  "command": "C:\\Users\\timbe\\AppData\\Local\\Android\\Sdk\\ndk\\27.0.12077973\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=aarch64-none-linux-android26 --sysroot=C:/Users/timbe/AppData/Local/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot -DENABLE_ARM_NEON -Dzerocopy_infer_EXPORTS -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++23 -O3 -flto -march=armv8-a+simd -O3 -flto -march=armv8-a+simd -fno-limit-debug-info  -fPIC -std=gnu++2b -o CMakeFiles\\zerocopy_infer.dir\\zerocopy_infer_jni.cpp.o -c C:\\zerocopy-infer\\android\\AndroidProject\\app\\src\\main\\cpp\\zerocopy_infer_jni.cpp",
+  "file": "C:\\zerocopy-infer\\android\\AndroidProject\\app\\src\\main\\cpp\\zerocopy_infer_jni.cpp"
+}
+]

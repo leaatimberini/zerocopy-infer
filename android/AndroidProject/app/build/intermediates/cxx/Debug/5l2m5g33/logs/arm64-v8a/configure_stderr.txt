@@ -1,0 +1,38 @@
+CMake Error at C:/Users/timbe/AppData/Local/Android/Sdk/cmake/3.22.1/share/cmake-3.22/Modules/CMakeTestCXXCompiler.cmake:62 (message):
+  The C++ compiler
+
+    "C:/Users/timbe/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/bin/clang++.exe"
+
+  is not able to compile a simple test program.
+
+  It fails with the following output:
+
+    Change Dir: C:/zerocopy-infer/android/AndroidProject/app/.cxx/Debug/5l2m5g33/arm64-v8a/CMakeFiles/CMakeTmp
+    
+    Run Build Command(s):C:\Users\timbe\AppData\Local\Android\Sdk\cmake\3.22.1\bin\ninja.exe cmTC_ed5d3 && [1/2] Building CXX object CMakeFiles/cmTC_ed5d3.dir/testCXXCompiler.cxx.o
+    FAILED: CMakeFiles/cmTC_ed5d3.dir/testCXXCompiler.cxx.o 
+    C:\Users\timbe\AppData\Local\Android\Sdk\ndk\25.1.8937393\toolchains\llvm\prebuilt\windows-x86_64\bin\clang++.exe --target=aarch64-none-linux-android26 --sysroot=C:/Users/timbe/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot   -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++23 -O3 -flto -march=armv8-a+simd  -fPIE -MD -MT CMakeFiles/cmTC_ed5d3.dir/testCXXCompiler.cxx.o -MF CMakeFiles\cmTC_ed5d3.dir\testCXXCompiler.cxx.o.d -o CMakeFiles/cmTC_ed5d3.dir/testCXXCompiler.cxx.o -c C:/zerocopy-infer/android/AndroidProject/app/.cxx/Debug/5l2m5g33/arm64-v8a/CMakeFiles/CMakeTmp/testCXXCompiler.cxx
+    error: invalid value 'c++23' in '-std=c++23'
+    note: use 'c++98' or 'c++03' for 'ISO C++ 1998 with amendments' standard
+    note: use 'gnu++98' or 'gnu++03' for 'ISO C++ 1998 with amendments and GNU extensions' standard
+    note: use 'c++11' for 'ISO C++ 2011 with amendments' standard
+    note: use 'gnu++11' for 'ISO C++ 2011 with amendments and GNU extensions' standard
+    note: use 'c++14' for 'ISO C++ 2014 with amendments' standard
+    note: use 'gnu++14' for 'ISO C++ 2014 with amendments and GNU extensions' standard
+    note: use 'c++17' for 'ISO C++ 2017 with amendments' standard
+    note: use 'gnu++17' for 'ISO C++ 2017 with amendments and GNU extensions' standard
+    note: use 'c++20' for 'ISO C++ 2020 DIS' standard
+    note: use 'gnu++20' for 'ISO C++ 2020 DIS with GNU extensions' standard
+    note: use 'c++2b' for 'Working draft for ISO C++ 2023 DIS' standard
+    note: use 'gnu++2b' for 'Working draft for ISO C++ 2023 DIS with GNU extensions' standard
+    ninja: build stopped: subcommand failed.
+    
+    
+
+  
+
+  CMake will not be able to correctly generate this project.
+Call Stack (most recent call first):
+  CMakeLists.txt:2 (project)
+
+
