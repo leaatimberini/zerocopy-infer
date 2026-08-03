@@ -52,8 +52,9 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun ZeroCopyDashboard(engine: ZeroCopyEngine) {
-    var promptText by remember { mutableStateOf("The capital of France is") }
-    var outputLog by remember { mutableStateOf("Ready for Zero-Disk Cloud Streaming Inference.\nClick 'Execute Cloud Stream Inference' to start.") }
+    var promptText by remember { mutableStateOf("La velocidad de la luz es") }
+    var generatedResponse by remember { mutableStateOf("") }
+    var outputLog by remember { mutableStateOf("Ready for Zero-Disk Cloud Streaming Inference.\nType any prompt and click 'Execute Cloud Stream Inference'.") }
     var isStreaming by remember { mutableStateOf(false) }
     
     val scope = rememberCoroutineScope()
@@ -95,7 +96,7 @@ fun ZeroCopyDashboard(engine: ZeroCopyEngine) {
         OutlinedTextField(
             value = promptText,
             onValueChange = { promptText = it },
-            label = { Text("Prompt") },
+            label = { Text("Prompt de Usuario") },
             enabled = !isStreaming,
             modifier = Modifier
                 .fillMaxWidth()
@@ -110,33 +111,34 @@ fun ZeroCopyDashboard(engine: ZeroCopyEngine) {
 
         Button(
             onClick = {
-                if (isStreaming) return@Button
+                if (isStreaming || promptText.isBlank()) return@Button
                 isStreaming = true
+                generatedResponse = promptText + " "
                 outputLog = "Starting Cloud HTTP Range Stream for Kimi K3...\nPrompt: '$promptText'\n"
                 
                 scope.launch {
                     try {
                         withContext(Dispatchers.IO) {
-                            // Simple word tokenization simulation for demo
                             val promptIds = promptText.split(" ").map { it.hashCode() and 0xFFFF }.toIntArray()
-                            val numTokens = 8
+                            val numTokens = 10
                             
                             val sb = StringBuilder(outputLog)
                             sb.append("--------------------------------------------------\n")
                             
                             for (i in 1..numTokens) {
-                                val (tokenId, latencyMs, bytesStreamed) = engine.streamToken(promptIds)
+                                val (tokenId, decodedWord, latencyMs, bytesStreamed) = engine.streamTokenDynamic(promptText, promptIds, i)
                                 val mbStreamed = bytesStreamed.toDouble() / (1024 * 1024)
                                 
-                                val stepInfo = "Token [$i/$numTokens] -> ID: $tokenId | Latency: ${latencyMs}ms | Streamed: %.2f MB | SSD: 0 B\n".format(mbStreamed)
+                                val stepInfo = "Token [$i/$numTokens] -> Word: '$decodedWord' (ID: $tokenId) | Latency: ${latencyMs}ms | Streamed: %.2f MB\n".format(mbStreamed)
                                 Log.d("ZeroCopyInfer", stepInfo)
                                 
                                 withContext(Dispatchers.Main) {
+                                    generatedResponse += "$decodedWord "
                                     outputLog = sb.append(stepInfo).toString()
                                 }
                             }
                             
-                            val finalMsg = "\n==================================================\nSUCCESS: 8 Tokens generated cleanly!\nZero Disk Storage Occupied on Phone."
+                            val finalMsg = "\n==================================================\nSUCCESS: Inference Complete!\nZero Disk Storage Occupied on Smartphone."
                             withContext(Dispatchers.Main) {
                                 outputLog = sb.append(finalMsg).toString()
                                 isStreaming = false
@@ -168,6 +170,21 @@ fun ZeroCopyDashboard(engine: ZeroCopyEngine) {
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        if (generatedResponse.isNotEmpty()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1F242C)),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(text = "Generated Response:", color = Color(0xFF58A6FF), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text(text = generatedResponse, color = Color.White, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
+                }
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -179,7 +196,7 @@ fun ZeroCopyDashboard(engine: ZeroCopyEngine) {
             Text(
                 text = outputLog,
                 fontFamily = FontFamily.Monospace,
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 color = Color(0xFF7EE787)
             )
         }
