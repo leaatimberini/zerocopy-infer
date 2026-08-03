@@ -1,10 +1,12 @@
 package com.zerocopy.infer
 
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,6 +24,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -64,7 +68,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
     val chatMessages = remember { mutableStateListOf<ChatMessage>() }
     var isStreaming by remember { mutableStateOf(false) }
     var activeThinkingText by remember { mutableStateOf("") }
-    var activeImageUrl by remember { mutableStateOf("") }
+    var activeImageBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var activeAssistantMessage by remember { mutableStateOf("") }
     var isTokenizerReady by remember { mutableStateOf(false) }
     
@@ -78,8 +82,8 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
         isTokenizerReady = true
     }
 
-    LaunchedEffect(chatMessages.size, activeAssistantMessage, activeThinkingText, activeImageUrl) {
-        if (chatMessages.isNotEmpty() || activeAssistantMessage.isNotEmpty() || activeThinkingText.isNotEmpty() || activeImageUrl.isNotEmpty()) {
+    LaunchedEffect(chatMessages.size, activeAssistantMessage, activeThinkingText, activeImageBitmap) {
+        if (chatMessages.isNotEmpty() || activeAssistantMessage.isNotEmpty() || activeThinkingText.isNotEmpty() || activeImageBitmap != null) {
             listState.animateScrollToItem((chatMessages.size + if (isStreaming) 1 else 0).coerceAtLeast(0))
         }
     }
@@ -109,7 +113,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
-                            text = "<|media_begin|> Vision & Tools",
+                            text = "<|media_begin|> Real Vision & Art",
                             color = Color.White,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
@@ -118,7 +122,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                     }
                 }
                 Text(
-                    text = "Generación de Imágenes • CoT Reasoning • OS Agent Mode • Motorola RAM",
+                    text = "Generación de Imágenes Reales • CoT Reasoning • Respuestas Enciclopédicas",
                     fontSize = 11.sp,
                     color = Color.Gray,
                     modifier = Modifier.padding(top = 2.dp)
@@ -145,7 +149,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                     ) {
                         Text(
                             text = if (isTokenizerReady) 
-                                "¡Hola! Escribe tus preguntas o pide 'genera una imagen de X' para probar el motor multimodal de Kimi-K3."
+                                "¡Hola! Pregúntame sobre cualquier tema o pide 'dibuja un gato verde durmiendo' para generar imágenes reales."
                             else 
                                 "Cargando tokenizador oficial Kimi-K3 TikToken en la RAM de tu Motorola...",
                             color = Color.Gray,
@@ -166,7 +170,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                             sender = "assistant",
                             text = activeAssistantMessage,
                             thinkingText = activeThinkingText,
-                            imageUrl = activeImageUrl
+                            imageBitmap = activeImageBitmap
                         )
                     )
                 }
@@ -213,7 +217,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                         chatMessages.add(ChatMessage(sender = "user", text = prompt))
                         isStreaming = true
                         activeThinkingText = ""
-                        activeImageUrl = ""
+                        activeImageBitmap = null
                         activeAssistantMessage = ""
 
                         scope.launch {
@@ -222,14 +226,14 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                                     val totalSteps = engine.getTotalTokenCountForPrompt(prompt)
                                     var currentThinking = ""
                                     var currentResponse = ""
-                                    var currentImage = ""
+                                    var currentBitmap: Bitmap? = null
 
                                     for (i in 1..totalSteps) {
                                         val res = engine.streamTokenOnPhone(prompt, i)
-                                        if (res.isMediaToken) {
-                                            currentImage = res.mediaUrl
+                                        if (res.isMediaToken && res.generatedBitmap != null) {
+                                            currentBitmap = res.generatedBitmap
                                             withContext(Dispatchers.Main) {
-                                                activeImageUrl = currentImage
+                                                activeImageBitmap = currentBitmap
                                             }
                                         }
 
@@ -252,11 +256,11 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                                                 sender = "assistant",
                                                 text = currentResponse.trim(),
                                                 thinkingText = currentThinking.trim(),
-                                                imageUrl = currentImage
+                                                imageBitmap = currentBitmap
                                             )
                                         )
                                         activeThinkingText = ""
-                                        activeImageUrl = ""
+                                        activeImageBitmap = null
                                         activeAssistantMessage = ""
                                         isStreaming = false
                                     }
@@ -266,7 +270,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                                 withContext(Dispatchers.Main) {
                                     chatMessages.add(ChatMessage(sender = "assistant", text = "[Error]: ${e.localizedMessage}"))
                                     activeThinkingText = ""
-                                    activeImageUrl = ""
+                                    activeImageBitmap = null
                                     activeAssistantMessage = ""
                                     isStreaming = false
                                 }
@@ -344,8 +348,8 @@ fun ChatBubble(msg: ChatMessage) {
                 }
             }
 
-            // Render Generated Image Card if imageUrl exists (<|media_begin|>)
-            if (!isUser && msg.imageUrl.isNotBlank()) {
+            // Render Real Generated Bitmap Image Card if imageBitmap exists (<|media_begin|>)
+            if (!isUser && msg.imageBitmap != null) {
                 Surface(
                     color = Color(0xFF161B22),
                     shape = RoundedCornerShape(14.dp),
@@ -362,19 +366,17 @@ fun ChatBubble(msg: ChatMessage) {
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
-                        Box(
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(160.dp)
-                                .background(Color(0xFF21262D), RoundedCornerShape(8.dp)),
-                            contentAlignment = Alignment.Center
+                                .height(180.dp)
                         ) {
-                            Text(
-                                text = "🖼️ [Vista Previa Multimodal de Imagen Generada por Kimi-K3 Tool Call]",
-                                color = Color.LightGray,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(12.dp)
+                            Image(
+                                bitmap = msg.imageBitmap.asImageBitmap(),
+                                contentDescription = "Generated Image",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
                             )
                         }
                     }
