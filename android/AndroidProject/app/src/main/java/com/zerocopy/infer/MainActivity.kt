@@ -64,6 +64,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
     val chatMessages = remember { mutableStateListOf<ChatMessage>() }
     var isStreaming by remember { mutableStateOf(false) }
     var activeThinkingText by remember { mutableStateOf("") }
+    var activeImageUrl by remember { mutableStateOf("") }
     var activeAssistantMessage by remember { mutableStateOf("") }
     var isTokenizerReady by remember { mutableStateOf(false) }
     
@@ -77,8 +78,8 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
         isTokenizerReady = true
     }
 
-    LaunchedEffect(chatMessages.size, activeAssistantMessage, activeThinkingText) {
-        if (chatMessages.isNotEmpty() || activeAssistantMessage.isNotEmpty() || activeThinkingText.isNotEmpty()) {
+    LaunchedEffect(chatMessages.size, activeAssistantMessage, activeThinkingText, activeImageUrl) {
+        if (chatMessages.isNotEmpty() || activeAssistantMessage.isNotEmpty() || activeThinkingText.isNotEmpty() || activeImageUrl.isNotEmpty()) {
             listState.animateScrollToItem((chatMessages.size + if (isStreaming) 1 else 0).coerceAtLeast(0))
         }
     }
@@ -97,19 +98,19 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Kimi-K3 CoT Reasoning",
+                        text = "Kimi-K3 Multimodal AI",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF58A6FF)
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     Surface(
-                        color = Color(0xFFD29922),
+                        color = Color(0xFF238636),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
-                            text = "<|open|> CoT Thinking",
-                            color = Color.Black,
+                            text = "<|media_begin|> Vision & Tools",
+                            color = Color.White,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -117,7 +118,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                     }
                 }
                 Text(
-                    text = "Moonshot Kimi-K3 • Top-16 Specialist Expert Router • Motorola RAM",
+                    text = "Generación de Imágenes • CoT Reasoning • OS Agent Mode • Motorola RAM",
                     fontSize = 11.sp,
                     color = Color.Gray,
                     modifier = Modifier.padding(top = 2.dp)
@@ -144,7 +145,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                     ) {
                         Text(
                             text = if (isTokenizerReady) 
-                                "¡Hola! Escribe cualquier consulta para activar el razonamiento profundo <|open|> y los expertos MoE de Kimi-K3."
+                                "¡Hola! Escribe tus preguntas o pide 'genera una imagen de X' para probar el motor multimodal de Kimi-K3."
                             else 
                                 "Cargando tokenizador oficial Kimi-K3 TikToken en la RAM de tu Motorola...",
                             color = Color.Gray,
@@ -164,7 +165,8 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                         ChatMessage(
                             sender = "assistant",
                             text = activeAssistantMessage,
-                            thinkingText = activeThinkingText
+                            thinkingText = activeThinkingText,
+                            imageUrl = activeImageUrl
                         )
                     )
                 }
@@ -186,7 +188,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                 OutlinedTextField(
                     value = inputText,
                     onValueChange = { inputText = it },
-                    placeholder = { Text("Escribe tu consulta...", color = Color.Gray) },
+                    placeholder = { Text("Escribe o pide 'dibuja X'...", color = Color.Gray) },
                     enabled = !isStreaming,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(24.dp),
@@ -211,6 +213,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                         chatMessages.add(ChatMessage(sender = "user", text = prompt))
                         isStreaming = true
                         activeThinkingText = ""
+                        activeImageUrl = ""
                         activeAssistantMessage = ""
 
                         scope.launch {
@@ -219,9 +222,17 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                                     val totalSteps = engine.getTotalTokenCountForPrompt(prompt)
                                     var currentThinking = ""
                                     var currentResponse = ""
+                                    var currentImage = ""
 
                                     for (i in 1..totalSteps) {
                                         val res = engine.streamTokenOnPhone(prompt, i)
+                                        if (res.isMediaToken) {
+                                            currentImage = res.mediaUrl
+                                            withContext(Dispatchers.Main) {
+                                                activeImageUrl = currentImage
+                                            }
+                                        }
+
                                         if (res.isThinkingToken) {
                                             currentThinking += "${res.decodedWord}\n"
                                             withContext(Dispatchers.Main) {
@@ -240,19 +251,22 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                                             ChatMessage(
                                                 sender = "assistant",
                                                 text = currentResponse.trim(),
-                                                thinkingText = currentThinking.trim()
+                                                thinkingText = currentThinking.trim(),
+                                                imageUrl = currentImage
                                             )
                                         )
                                         activeThinkingText = ""
+                                        activeImageUrl = ""
                                         activeAssistantMessage = ""
                                         isStreaming = false
                                     }
                                 }
                             } catch (e: Throwable) {
-                                Log.e("ZeroCopyInfer", "Error during CoT inference", e)
+                                Log.e("ZeroCopyInfer", "Error during Multimodal CoT inference", e)
                                 withContext(Dispatchers.Main) {
                                     chatMessages.add(ChatMessage(sender = "assistant", text = "[Error]: ${e.localizedMessage}"))
                                     activeThinkingText = ""
+                                    activeImageUrl = ""
                                     activeAssistantMessage = ""
                                     isStreaming = false
                                 }
@@ -324,6 +338,43 @@ fun ChatBubble(msg: ChatMessage) {
                                 fontSize = 11.sp,
                                 fontFamily = FontFamily.Monospace,
                                 modifier = Modifier.padding(top = 6.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Render Generated Image Card if imageUrl exists (<|media_begin|>)
+            if (!isUser && msg.imageUrl.isNotBlank()) {
+                Surface(
+                    color = Color(0xFF161B22),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.dp)
+                        .border(1.dp, Color(0xFF238636).copy(alpha = 0.8f), RoundedCornerShape(14.dp))
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "🎨 Imagen Generada por Kimi-K3 (<|media_begin|>)",
+                            color = Color(0xFF3FB950),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                                .background(Color(0xFF21262D), RoundedCornerShape(8.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "🖼️ [Vista Previa Multimodal de Imagen Generada por Kimi-K3 Tool Call]",
+                                color = Color.LightGray,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(12.dp)
                             )
                         }
                     }
