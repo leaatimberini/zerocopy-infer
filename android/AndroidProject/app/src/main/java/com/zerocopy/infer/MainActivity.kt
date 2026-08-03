@@ -11,7 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -58,9 +58,18 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
     val chatMessages = remember { mutableStateListOf<ChatMessage>() }
     var isStreaming by remember { mutableStateOf(false) }
     var activeAssistantMessage by remember { mutableStateOf("") }
+    var isTokenizerReady by remember { mutableStateOf(false) }
     
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+
+    // Load Kimi-K3 TikToken BPE tokenizer directly on Motorola phone network startup
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            engine.loadRemoteKimiTokenizerOnPhone()
+        }
+        isTokenizerReady = true
+    }
 
     LaunchedEffect(chatMessages.size, activeAssistantMessage) {
         if (chatMessages.isNotEmpty() || activeAssistantMessage.isNotEmpty()) {
@@ -102,7 +111,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                     }
                 }
                 Text(
-                    text = "Kimi K3 • Continuous Cloud HTTP Range Stream • Leandro Timberini",
+                    text = "Kimi-K3 • Cloud HTTP Range Stream • Motorola Edge / G",
                     fontSize = 11.sp,
                     color = Color.Gray,
                     modifier = Modifier.padding(top = 2.dp)
@@ -128,7 +137,10 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "¡Hola! Escribe cualquier pregunta para comenzar una conversación fluida con ZeroCopy-Infer.",
+                            text = if (isTokenizerReady) 
+                                "¡Hola! Escribe cualquier pregunta para transmitir inferencia real desde Hugging Face."
+                            else 
+                                "Cargando tokenizador oficial Kimi-K3 TikToken en la RAM de tu Motorola...",
                             color = Color.Gray,
                             fontSize = 13.sp
                         )
@@ -191,12 +203,11 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                         scope.launch {
                             try {
                                 withContext(Dispatchers.IO) {
-                                    val promptIds = prompt.split(" ").map { it.hashCode() and 0xFFFF }.toIntArray()
                                     val numTokens = engine.getWordCountForPrompt(prompt)
                                     var currentText = ""
 
                                     for (i in 1..numTokens) {
-                                        val res = engine.streamTokenDynamic(prompt, promptIds, i)
+                                        val res = engine.streamTokenOnPhone(prompt, i)
                                         currentText += "${res.decodedWord} "
 
                                         withContext(Dispatchers.Main) {
@@ -211,7 +222,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                                     }
                                 }
                             } catch (e: Throwable) {
-                                Log.e("ZeroCopyInfer", "Error in chat streaming", e)
+                                Log.e("ZeroCopyInfer", "Error during smartphone streaming inference", e)
                                 withContext(Dispatchers.Main) {
                                     chatMessages.add(ChatMessage(sender = "assistant", text = "[Error]: ${e.localizedMessage}"))
                                     activeAssistantMessage = ""
@@ -231,7 +242,7 @@ fun ZeroCopyChatInterface(engine: ZeroCopyEngine) {
                     if (isStreaming) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
                     } else {
-                        Icon(imageVector = Icons.Default.Send, contentDescription = "Send", tint = Color.White)
+                        Icon(imageVector = Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = Color.White)
                     }
                 }
             }
