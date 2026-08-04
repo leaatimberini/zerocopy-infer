@@ -123,7 +123,7 @@ class ZeroCopyMoEEngine:
             )
             
         self.ram_cache_gb = ram_cache_gb
-        self.hidden_dim = 1024  # Compact 1024 projection for Termux mobile ARM64 NEON LPDDR5 execution
+        self.hidden_dim = self.config.hidden_size  # Exact Kimi-K3 hidden dimension: 7168
         self.tokenizer = ZeroCopyKimiTokenizer(repo_id=streamer.repo_id)
         
         # LRU cache for streamed tensor weights in RAM
@@ -295,8 +295,9 @@ class ZeroCopyMoEEngine:
         if not input_token_ids:
             input_token_ids = [self.config.bos_token_id, 1000]
             
-        embed_name = "model.embed_tokens.weight"
-        W_embed_full = self.fetch_weight_tensor(embed_name, (66634, self.hidden_dim))
+        embed_name = "language_model.model.embed_tokens.weight"
+        W_embed_tensor = self.fetch_weight_tensor(embed_name, (163840, self.hidden_dim))
+        W_embed_full = W_embed_tensor[:, :self.hidden_dim]
         
         # Build active vocabulary matrix from clean Spanish/Latin BPE ranks
         clean_ranks = getattr(self.tokenizer, "clean_latin_ranks", [])
@@ -330,7 +331,7 @@ class ZeroCopyMoEEngine:
                 else:
                     hidden_states = self.compute_moe_forward_layer(layer_idx, hidden_states)
                 
-            norm_weight = self.fetch_weight_tensor("model.norm.weight", (self.hidden_dim,))[:self.hidden_dim]
+            norm_weight = self.fetch_weight_tensor("language_model.model.norm.weight", (self.hidden_dim,))[:self.hidden_dim]
             norm_hidden = self.rms_norm(hidden_states, norm_weight)
             
             # Real Causal LM Logit Projection over Clean Spanish Vocabulary: logits = W_vocab * norm_hidden

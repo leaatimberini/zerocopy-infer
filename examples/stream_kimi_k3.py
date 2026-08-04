@@ -36,6 +36,7 @@ def main():
     shard_filenames = [
         "model-00001-of-000096.safetensors",
         "model-00042-of-000096.safetensors",
+        "model-00094-of-000096.safetensors",
         "model-00096-of-000096.safetensors",
     ]
     
