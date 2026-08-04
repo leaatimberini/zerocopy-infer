@@ -92,11 +92,22 @@ class SafetensorsRangeStreamer:
                 weight_map = data.get("weight_map", {})
                 for tensor_name, shard_file in weight_map.items():
                     self.shard_index[tensor_name] = shard_file
-                    # Aliases for stripped prefixes
-                    if tensor_name.startswith("language_model.model."):
-                        self.shard_index[tensor_name.replace("language_model.", "")] = shard_file
-                    elif tensor_name.startswith("language_model."):
-                        self.shard_index[tensor_name.replace("language_model.", "")] = shard_file
+                    # Comprehensive aliases for model naming variations across HF repos
+                    clean_name = tensor_name.replace("language_model.", "").replace("model.", "")
+                    self.shard_index[clean_name] = shard_file
+                    self.shard_index[f"model.{clean_name}"] = shard_file
+                    self.shard_index[f"language_model.model.{clean_name}"] = shard_file
+                    
+                    if "embed_tokens" in tensor_name or "embed" in tensor_name:
+                        self.shard_index["model.embed_tokens.weight"] = shard_file
+                        self.shard_index["embed_tokens.weight"] = shard_file
+                        self.shard_index["language_model.model.embed_tokens.weight"] = shard_file
+                        
+                    if "norm" in tensor_name and "weight" in tensor_name:
+                        if "input_layernorm" not in tensor_name and "post_attention" not in tensor_name:
+                            self.shard_index["model.norm.weight"] = shard_file
+                            self.shard_index["language_model.model.norm.weight"] = shard_file
+                            self.shard_index["model.final_layernorm.weight"] = shard_file
                 print(f"[ZeroCopy-Infer] Successfully indexed {len(weight_map)} global model tensors across all 96 shards (100% Zero-Disk)!")
                 return True
         except Exception as e:
