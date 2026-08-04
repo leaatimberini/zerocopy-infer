@@ -19,7 +19,7 @@ class HFRangeClient:
     HTTP Client that executes byte-level Range Requests against Hugging Face URLs
     without saving any data to local disk.
     """
-    def __init__(self, token: Optional[str] = None, timeout: float = 10.0):
+    def __init__(self, token: Optional[str] = None, timeout: float = 120.0):
         self.token = token
         self.timeout = timeout
         self.headers = {
@@ -170,3 +170,41 @@ class SafetensorsRangeStreamer:
             vectors.append(f32)
             
         return np.array(vectors, dtype=np.float32)
+
+    def fetch_embedding_block(self, start_row: int, num_rows: int, hidden_dim: int = 7168) -> np.ndarray:
+        """
+        Downloads a contiguous block of embedding rows [start_row, start_row+num_rows)
+        in a SINGLE HTTP Range Request. Much more efficient than per-token fetching.
+        For 5000 rows in BF16: 5000 × 7168 × 2 = ~68 MB (one request).
+        """
+        embed_key = "language_model.model.embed_tokens.weight"
+        if embed_key not in self.tensor_map:
+            embed_key = "model.embed_tokens.weight"
+        if embed_key not in self.tensor_map:
+            return None
+            
+        meta = self.tensor_map[embed_key]
+        vocab_size = meta["shape"][0]
+        actual_hidden = meta["shape"][1] if len(meta["shape"]) > 1 else hidden_dim
+        
+        # Clamp to actual vocab size
+        start_row = min(start_row, vocab_size - 1)
+        num_rows = min(num_rows, vocab_size - start_row)
+        
+        # Calculate byte offsets within the tensor data
+        bytes_per_element = 2 if meta["dtype"] in ("BF16", "F16") else 4
+        row_bytes = actual_hidden * bytes_per_element
+        start_byte = meta["start_byte"] + start_row * row_bytes
+        end_byte = start_byte + num_rows * row_bytes - 1
+        
+        print(f"[ZeroCopy-Infer] Streaming embedding block: rows {start_row}-{start_row+num_rows-1} ({num_rows * row_bytes / (1024*1024):.1f} MB)...")
+        raw_bytes = self.client.fetch_range(meta["shard_url"], start_byte, end_byte)
+        
+        if meta["dtype"] == "BF16":
+            u16 = np.frombuffer(raw_bytes, dtype=np.uint16)
+            u32 = u16.astype(np.uint32) << 16
+            return u32.view(np.float32).reshape(num_rows, actual_hidden)
+        elif meta["dtype"] == "F16":
+            return np.frombuffer(raw_bytes, dtype=np.float16).reshape(num_rows, actual_hidden).astype(np.float32)
+        else:
+            return np.frombuffer(raw_bytes, dtype=np.float32).reshape(num_rows, actual_hidden)
