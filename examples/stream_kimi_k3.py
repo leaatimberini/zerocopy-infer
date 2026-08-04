@@ -28,39 +28,39 @@ from zerocopy_infer import SafetensorsRangeStreamer, ZeroCopyMoEEngine
 def main():
     parser = argparse.ArgumentParser(description="ZeroCopy-Infer: Pure Safetensors Zero-Disk MoE Streaming Forward-Pass Engine")
     parser.add_argument("prompt", nargs="?", default="¿Qué es la inteligencia artificial?", help="User prompt")
-    parser.add_argument("--layers", type=int, default=4, help="Number of transformer layers to execute (default: 4, max: 93)")
+    parser.add_argument("--repo", type=str, default="moonshotai/Kimi-K3", help="Hugging Face model repository ID (e.g. XiaomiMiMo/MiMo-V2.5-Pro)")
+    parser.add_argument("--layers", type=int, default=4, help="Number of transformer layers to execute (default: 4)")
     parser.add_argument("--tokens", type=int, default=10, help="Number of tokens to generate")
     parser.add_argument("--cache-gb", type=float, default=4.0, help="RAM cache size in GB (default: 4.0)")
     parser.add_argument("--shards", type=int, default=6, help="Number of initial model shards to index (default: 6)")
     args = parser.parse_args()
     
     print("================================================================================")
-    print(" ZeroCopy-Infer: Pure Safetensors Zero-Disk MoE Streaming Forward-Pass Engine")
+    print(" ZeroCopy-Infer: Universal Cloud-Native MoE Streaming Inference Engine")
     print(" Authored by Leandro Emanuel Timberini (Ituzaingó, Buenos Aires, Argentina)")
     print("================================================================================")
     
     prompt = args.prompt
-    repo_id = "moonshotai/Kimi-K3"
+    repo_id = args.repo
+    print(f"[ZeroCopy-Infer] Target Repository: {repo_id}")
     
-    # Dynamically build shard list: Shards 1..N plus final shard 96
-    shard_filenames = [f"model-{i:05d}-of-000096.safetensors" for i in range(1, min(96, args.shards + 1))]
-    if "model-00096-of-000096.safetensors" not in shard_filenames:
-        shard_filenames.append("model-00096-of-000096.safetensors")
-    
-    streamer = SafetensorsRangeStreamer(repo_id=repo_id, shards=shard_filenames)
+    streamer = SafetensorsRangeStreamer(repo_id=repo_id, shards=[])
     
     print("\n[1/3] Step 1: Initializing HTTP Range Header Parser...")
+    remote_cfg_dict = streamer.fetch_remote_config()
     try:
         streamer.parse_headers()
     except Exception as e:
         print(f"[Info] Remote header parse notice: {e}")
 
+    # Build model configuration from remote config.json if available
+    from zerocopy_infer.moe_inference_engine import KimiK3Config
+    model_config = KimiK3Config.from_remote_dict(remote_cfg_dict)
+
     print(f"\n[2/3] Step 2: Initializing MoE Engine ({args.layers} active layers, {args.cache_gb} GB cache)...")
     engine = ZeroCopyMoEEngine(
         streamer=streamer,
-        num_layers=93,
-        num_total_experts=896,
-        top_k_experts=16,
+        config=model_config,
         ram_cache_gb=args.cache_gb,
         num_active_layers=args.layers,
     )

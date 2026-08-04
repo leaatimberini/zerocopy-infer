@@ -99,6 +99,24 @@ class KimiK3Config:
     def is_kda_layer(self, layer_idx: int) -> bool:
         return (layer_idx + 1) in self.kda_layers
 
+    @classmethod
+    def from_remote_dict(cls, cfg: Dict[str, Any]):
+        """
+        Builds model configuration dynamically from Hugging Face config.json.
+        """
+        if not cfg:
+            return cls()
+        return cls(
+            vocab_size=cfg.get("vocab_size", 163840),
+            hidden_size=cfg.get("hidden_size", cfg.get("d_model", 7168)),
+            intermediate_size=cfg.get("intermediate_size", 33792),
+            num_hidden_layers=cfg.get("num_hidden_layers", cfg.get("num_layers", 93)),
+            num_experts=cfg.get("num_experts", cfg.get("num_routed_experts", cfg.get("num_local_experts", 896))),
+            num_experts_per_token=cfg.get("num_experts_per_token", cfg.get("num_experts_per_tok", 16)),
+            routed_expert_hidden_size=cfg.get("routed_expert_hidden_size", cfg.get("moe_intermediate_size", 3584)),
+            moe_intermediate_size=cfg.get("moe_intermediate_size", cfg.get("intermediate_size", 3072)),
+        )
+
 class ZeroCopyMoEEngine:
     """
     Zero-Disk Pure Safetensors MoE & KDA Forward-Pass Engine for Kimi K3.

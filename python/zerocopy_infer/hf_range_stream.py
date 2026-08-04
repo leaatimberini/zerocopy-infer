@@ -61,6 +61,21 @@ class SafetensorsRangeStreamer:
         self.parsed_shards: set = set()
         self.base_url = f"https://huggingface.co/{repo_id}/resolve/main"
 
+    def fetch_remote_config(self) -> Dict[str, Any]:
+        """
+        Fetches remote config.json directly from Hugging Face repository into RAM.
+        """
+        config_url = f"{self.base_url}/config.json"
+        try:
+            req = urllib.request.Request(config_url, headers=self.client.headers)
+            with urllib.request.urlopen(req, timeout=10.0) as resp:
+                cfg = json.loads(resp.read().decode("utf-8"))
+                print(f"[ZeroCopy-Infer] Remote config.json loaded for '{self.repo_id}': model_type={cfg.get('model_type', 'unknown')}")
+                return cfg
+        except Exception as e:
+            print(f"[ZeroCopy-Infer] Notice fetching config.json ({e}). Using default parameters.")
+            return {}
+
     def load_index_json(self) -> bool:
         """
         Loads remote model.safetensors.index.json directly from Hugging Face (~1.5 MB)
