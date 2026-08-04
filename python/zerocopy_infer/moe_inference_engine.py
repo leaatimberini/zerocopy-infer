@@ -226,6 +226,21 @@ class ZeroCopyMoEEngine:
         """
         return x * self.sigmoid(x)
 
+    def linear_proj(self, W: np.ndarray, x: np.ndarray) -> np.ndarray:
+        """
+        Computes linear projection Y = W @ x or W.T @ x dynamically.
+        Handles PyTorch/Safetensors transposed weight orientation [out_features, in_features] vs [in_features, out_features].
+        """
+        if W.ndim == 1:
+            return W * x
+        if W.shape[1] == x.shape[0]:
+            return np.matmul(W, x)
+        elif W.shape[0] == x.shape[0]:
+            return np.matmul(W.T, x)
+        else:
+            min_dim = min(W.shape[1], x.shape[0])
+            return np.matmul(W[:min_dim, :min_dim], x[:min_dim])
+
     def compute_kda_layer(self, layer_idx: int, hidden_states: np.ndarray) -> np.ndarray:
         """
         Executes Kimi Delta Attention (KDA) Recurrent Linear Layer Update (69 KDA layers):
@@ -250,9 +265,9 @@ class ZeroCopyMoEEngine:
         if W_Q is None or W_K is None or W_V is None:
             return hidden_states  # Skip layer if QKV projections are not in indexed shards
         
-        Q = np.matmul(W_Q, normed)
-        K = np.matmul(W_K, normed)
-        V = np.matmul(W_V, normed)
+        Q = self.linear_proj(W_Q, normed)
+        K = self.linear_proj(W_K, normed)
+        V = self.linear_proj(W_V, normed)
         
         # Delta Attention Recurrent State Projection
         delta = self.sigmoid(Q) * K
@@ -264,7 +279,7 @@ class ZeroCopyMoEEngine:
         if W_O is None:
             return hidden_states
             
-        return hidden_states + np.matmul(W_O, kda_out)
+        return hidden_states + self.linear_proj(W_O, kda_out)
 
     def compute_moe_forward_layer(self, layer_idx: int, hidden_states: np.ndarray) -> np.ndarray:
         """
@@ -283,7 +298,7 @@ class ZeroCopyMoEEngine:
             return hidden_states  # Skip MoE if gate router is not in indexed shards
         
         # Router Logits with Sigmoid Router Activation (config.json)
-        router_logits = np.matmul(W_gate, normed)
+        router_logits = self.linear_proj(W_gate, normed)
         if self.config.moe_router_activation_func == "sigmoid":
             expert_scores = self.sigmoid(router_logits)
         else:
@@ -317,9 +332,9 @@ class ZeroCopyMoEEngine:
             if W1 is None or W2 is None or W3 is None:
                 continue  # Skip expert if its weights are not in indexed shards
             
-            gate_proj = self.silu(np.matmul(W1, normed))
-            up_proj = np.matmul(W3, normed)
-            expert_out = np.matmul(W2, gate_proj * up_proj)
+            gate_proj = self.silu(self.linear_proj(W1, normed))
+            up_proj = self.linear_proj(W3, normed)
+            expert_out = self.linear_proj(W2, gate_proj * up_proj)
             
             moe_output += weight_val * expert_out
 
@@ -331,7 +346,7 @@ class ZeroCopyMoEEngine:
             SW1 = self.fetch_weight_tensor(sw1_name, (self.moe_inter, self.hidden_dim))
             SW2 = self.fetch_weight_tensor(sw2_name, (self.hidden_dim, self.moe_inter))
             if SW1 is not None and SW2 is not None:
-                shared_out = np.matmul(SW2, self.silu(np.matmul(SW1, normed)))
+                shared_out = self.linear_proj(SW2, self.silu(self.linear_proj(SW1, normed)))
                 moe_output += shared_out
 
         return hidden_states + moe_output
