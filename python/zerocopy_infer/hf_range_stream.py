@@ -208,22 +208,50 @@ class SafetensorsRangeStreamer:
         arr = np.frombuffer(raw_bytes, dtype=np_dtype).reshape(meta["shape"])
         return arr.astype(np.float32)
 
+    def ensure_tensor_header(self, tensor_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Ensures a tensor's header metadata is parsed into self.tensor_map.
+        Tries multiple model alias names and lazy-loads the shard header on demand.
+        """
+        candidates = [
+            tensor_name,
+            f"language_model.model.{tensor_name.replace('model.', '')}",
+            f"model.{tensor_name.replace('language_model.model.', '').replace('model.', '')}",
+            tensor_name.replace("language_model.", ""),
+            tensor_name.replace("language_model.model.", ""),
+            "model.embed_tokens.weight",
+            "language_model.model.embed_tokens.weight",
+            "embed_tokens.weight",
+        ]
+        for key in candidates:
+            if key in self.tensor_map:
+                return self.tensor_map[key]
+                
+            shard_file = self.shard_index.get(key)
+            if shard_file:
+                print(f"[ZeroCopy-Infer] Lazy-loading header for {shard_file} ({key})...")
+                if self.parse_shard_header(shard_file):
+                    for sub_key in candidates:
+                        if sub_key in self.tensor_map:
+                            return self.tensor_map[sub_key]
+        return None
+
     def fetch_token_embedding_vectors(self, token_ids: List[int], hidden_dim: int = 7168) -> np.ndarray:
         """
         Streams exact bfloat16 embedding vectors for a list of token IDs directly from HF.
         """
-        embed_key = "language_model.model.embed_tokens.weight"
-        if embed_key not in self.tensor_map:
-            embed_key = "model.embed_tokens.weight"
+        meta = self.ensure_tensor_header("model.embed_tokens.weight")
+        if meta is None:
+            raise KeyError("Embedding tensor not found in model index.")
             
-        meta = self.tensor_map[embed_key]
         h_start = meta["start_byte"]
+        actual_hidden = meta["shape"][1] if len(meta["shape"]) > 1 else hidden_dim
         
         vectors = []
         for tid in token_ids:
             safe_tid = tid % meta["shape"][0]
-            byte_offset = h_start + safe_tid * hidden_dim * 2
-            raw = self.client.fetch_range(meta["shard_url"], byte_offset, byte_offset + hidden_dim * 2 - 1)
+            byte_offset = h_start + safe_tid * actual_hidden * 2
+            raw = self.client.fetch_range(meta["shard_url"], byte_offset, byte_offset + actual_hidden * 2 - 1)
             u16 = np.frombuffer(raw, dtype=np.uint16)
             u32 = u16.astype(np.uint32) << 16
             f32 = u32.view(np.float32)
@@ -234,24 +262,18 @@ class SafetensorsRangeStreamer:
     def fetch_embedding_block(self, start_row: int, num_rows: int, hidden_dim: int = 7168) -> np.ndarray:
         """
         Downloads a contiguous block of embedding rows [start_row, start_row+num_rows)
-        in a SINGLE HTTP Range Request. Much more efficient than per-token fetching.
-        For 5000 rows in BF16: 5000 × 7168 × 2 = ~68 MB (one request).
+        in a SINGLE HTTP Range Request.
         """
-        embed_key = "language_model.model.embed_tokens.weight"
-        if embed_key not in self.tensor_map:
-            embed_key = "model.embed_tokens.weight"
-        if embed_key not in self.tensor_map:
+        meta = self.ensure_tensor_header("model.embed_tokens.weight")
+        if meta is None:
             return None
             
-        meta = self.tensor_map[embed_key]
         vocab_size = meta["shape"][0]
         actual_hidden = meta["shape"][1] if len(meta["shape"]) > 1 else hidden_dim
         
-        # Clamp to actual vocab size
         start_row = min(start_row, vocab_size - 1)
         num_rows = min(num_rows, vocab_size - start_row)
         
-        # Calculate byte offsets within the tensor data
         bytes_per_element = 2 if meta["dtype"] in ("BF16", "F16") else 4
         row_bytes = actual_hidden * bytes_per_element
         start_byte = meta["start_byte"] + start_row * row_bytes
@@ -275,16 +297,11 @@ class SafetensorsRangeStreamer:
         """
         Stream embeddings for an arbitrary set of token IDs (e.g. Spanish vocabulary)
         by clustering nearby token IDs into a minimal set of HTTP Range Requests.
-        
-        Returns (embedding_matrix [N, hidden_dim], active_token_ids [N]).
         """
-        embed_key = "language_model.model.embed_tokens.weight"
-        if embed_key not in self.tensor_map:
-            embed_key = "model.embed_tokens.weight"
-        if embed_key not in self.tensor_map:
+        meta = self.ensure_tensor_header("model.embed_tokens.weight")
+        if meta is None:
             return None, []
 
-        meta = self.tensor_map[embed_key]
         vocab_size = meta["shape"][0]
         actual_hidden = meta["shape"][1] if len(meta["shape"]) > 1 else hidden_dim
         
