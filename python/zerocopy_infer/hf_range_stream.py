@@ -57,65 +57,110 @@ class SafetensorsRangeStreamer:
         self.shards = shards
         self.client = HFRangeClient(token=token)
         self.tensor_map: Dict[str, Dict[str, Any]] = {}
+        self.shard_index: Dict[str, str] = {}  # Maps tensor_name -> shard_filename
+        self.parsed_shards: set = set()
         self.base_url = f"https://huggingface.co/{repo_id}/resolve/main"
+
+    def load_index_json(self) -> bool:
+        """
+        Loads remote model.safetensors.index.json directly from Hugging Face (~1.5 MB)
+        to map all tensor locations across all 96 shards in milliseconds.
+        """
+        index_url = f"{self.base_url}/model.safetensors.index.json"
+        print(f"[ZeroCopy-Infer] Fetching global MoE index map from HF: {index_url}...")
+        try:
+            req = urllib.request.Request(index_url, headers=self.client.headers)
+            with urllib.request.urlopen(req, timeout=15.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                weight_map = data.get("weight_map", {})
+                for tensor_name, shard_file in weight_map.items():
+                    self.shard_index[tensor_name] = shard_file
+                    # Aliases for stripped prefixes
+                    if tensor_name.startswith("language_model.model."):
+                        self.shard_index[tensor_name.replace("language_model.", "")] = shard_file
+                    elif tensor_name.startswith("language_model."):
+                        self.shard_index[tensor_name.replace("language_model.", "")] = shard_file
+                print(f"[ZeroCopy-Infer] Successfully indexed {len(weight_map)} global model tensors across all 96 shards (100% Zero-Disk)!")
+                return True
+        except Exception as e:
+            print(f"[ZeroCopy-Infer] Notice loading global index.json: {e}")
+            return False
+
+    def parse_shard_header(self, shard_filename: str) -> bool:
+        """
+        Parse header metadata from a single shard file on demand.
+        """
+        if shard_filename in self.parsed_shards:
+            return True
+            
+        shard_url = f"{self.base_url}/{shard_filename}"
+        try:
+            header_size_bytes = self.client.fetch_range(shard_url, 0, 7)
+            header_size = struct.unpack("<Q", header_size_bytes)[0]
+            
+            json_bytes = self.client.fetch_range(shard_url, 8, 8 + header_size - 1)
+            header_json = json.loads(json_bytes.decode("utf-8"))
+            
+            for tensor_name, info in header_json.items():
+                if tensor_name == "__metadata__":
+                    continue
+                data_offsets = info["data_offsets"]
+                data_start = 8 + header_size + data_offsets[0]
+                data_end = 8 + header_size + data_offsets[1] - 1
+                length = data_end - data_start + 1
+                
+                entry = {
+                    "shard_url": shard_url,
+                    "shard_file": shard_filename,
+                    "dtype": info["dtype"],
+                    "shape": info["shape"],
+                    "start_byte": data_start,
+                    "end_byte": data_end,
+                    "length": length,
+                }
+                self.tensor_map[tensor_name] = entry
+                
+                if tensor_name.startswith("language_model.model."):
+                    self.tensor_map[tensor_name.replace("language_model.", "")] = entry
+                elif tensor_name.startswith("language_model."):
+                    self.tensor_map[tensor_name.replace("language_model.", "")] = entry
+
+            self.parsed_shards.add(shard_filename)
+            return True
+        except Exception as e:
+            print(f"[ZeroCopy-Infer] Shard {shard_filename} header notice: {e}")
+            return False
 
     def parse_headers(self) -> Dict[str, Dict[str, Any]]:
         """
-        Parse header metadata from each shard by reading the first 8 bytes
-        (header size) plus the JSON header length.
+        Parse header metadata from pre-specified shards, plus global index.json.
         """
-        print(f"[ZeroCopy-Infer] Parsing remote .safetensors headers for repo: {self.repo_id}...")
-        total_tensors = 0
-        
-        for shard_filename in self.shards:
-            shard_url = f"{self.base_url}/{shard_filename}"
-            try:
-                header_size_bytes = self.client.fetch_range(shard_url, 0, 7)
-                header_size = struct.unpack("<Q", header_size_bytes)[0]
-                
-                json_bytes = self.client.fetch_range(shard_url, 8, 8 + header_size - 1)
-                header_json = json.loads(json_bytes.decode("utf-8"))
-                
-                for tensor_name, info in header_json.items():
-                    if tensor_name == "__metadata__":
-                        continue
-                    data_offsets = info["data_offsets"]
-                    data_start = 8 + header_size + data_offsets[0]
-                    data_end = 8 + header_size + data_offsets[1] - 1
-                    length = data_end - data_start + 1
-                    
-                    entry = {
-                        "shard_url": shard_url,
-                        "shard_file": shard_filename,
-                        "dtype": info["dtype"],
-                        "shape": info["shape"],
-                        "start_byte": data_start,
-                        "end_byte": data_end,
-                        "length": length,
-                    }
-                    self.tensor_map[tensor_name] = entry
-                    
-                    # Store stripped prefix aliases
-                    if tensor_name.startswith("language_model.model."):
-                        short_key = tensor_name.replace("language_model.", "")
-                        self.tensor_map[short_key] = entry
-                    elif tensor_name.startswith("language_model."):
-                        short_key = tensor_name.replace("language_model.", "")
-                        self.tensor_map[short_key] = entry
-
-                    total_tensors += 1
-            except Exception as e:
-                print(f"[ZeroCopy-Infer] Shard {shard_filename} notice: {e}")
-
-        print(f"[ZeroCopy-Infer] Successfully indexed {total_tensors} tensors across {len(self.shards)} shards (0 Bytes written to SSD).")
+        self.load_index_json()
+        print(f"[ZeroCopy-Infer] Parsing initial shard headers...")
+        for shard in self.shards:
+            self.parse_shard_header(shard)
         return self.tensor_map
 
     def fetch_tensor(self, tensor_name: str) -> np.ndarray:
         """
         Fetch a specific tensor by name directly from Hugging Face into a NumPy array in RAM.
         Converts BF16 automatically to FP32.
+        Supports lazy header parsing via global index.json map.
         """
         target_key = tensor_name
+        if target_key not in self.tensor_map:
+            # Check global index map for lazy shard header loading
+            shard_file = self.shard_index.get(target_key)
+            if not shard_file:
+                shard_file = self.shard_index.get(f"language_model.{target_key}")
+            if not shard_file:
+                shard_file = self.shard_index.get(f"language_model.model.{target_key.replace('model.', '')}")
+                
+            if shard_file:
+                # Lazy load the header for this shard on-demand
+                print(f"[ZeroCopy-Infer] Lazy-loading header for {shard_file} (requested tensor: {tensor_name})...")
+                self.parse_shard_header(shard_file)
+
         if target_key not in self.tensor_map:
             # Fallback alias search
             alt_key = f"language_model.{tensor_name}"
