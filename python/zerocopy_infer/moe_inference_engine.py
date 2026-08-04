@@ -153,15 +153,21 @@ class ZeroCopyMoEEngine:
         self.tokenizer = ZeroCopyKimiTokenizer(repo_id=streamer.repo_id)
         
         # LRU cache for streamed tensor weights in RAM
+        self.max_cache_bytes = int(ram_cache_gb * 1024 * 1024 * 1024)
         self.tensor_lru_cache: OrderedDict[str, np.ndarray] = OrderedDict()
-        self.max_cache_bytes = int(ram_cache_gb * (1024 ** 3))
         self.current_cache_bytes = 0
         
         # Chat history & Telemetry
         self.chat_history: List[Dict[str, str]] = []
         self.tokens_generated = 0
-        self.total_range_requests = 0
-        self.total_bytes_streamed = 0
+
+    @property
+    def total_bytes_streamed(self) -> int:
+        return self.streamer.total_bytes_streamed
+
+    @property
+    def total_range_requests(self) -> int:
+        return self.streamer.total_range_requests
 
     def fetch_weight_tensor(self, tensor_name: str, fallback_shape: Tuple[int, ...]) -> Optional[np.ndarray]:
         """
@@ -172,25 +178,12 @@ class ZeroCopyMoEEngine:
             self.tensor_lru_cache.move_to_end(tensor_name)
             return self.tensor_lru_cache[tensor_name]
         
-        target_key = tensor_name
-        if target_key not in self.streamer.tensor_map:
-            alt_key = f"language_model.{tensor_name}"
-            if alt_key in self.streamer.tensor_map:
-                target_key = alt_key
-            else:
-                alt_key2 = f"language_model.model.{tensor_name.replace('model.', '')}"
-                if alt_key2 in self.streamer.tensor_map:
-                    target_key = alt_key2
-                else:
-                    # Tensor is not in any indexed shard — return None so compute loop can skip
-                    return None
+        meta = self.streamer.ensure_tensor_header(tensor_name)
+        if meta is None:
+            return None
 
         try:
-            arr = self.streamer.fetch_tensor(target_key)
-            meta = self.streamer.tensor_map[target_key]
-            self.total_bytes_streamed += meta["length"]
-            self.total_range_requests += 1
-            
+            arr = self.streamer.fetch_tensor(tensor_name)
             arr_bytes = arr.nbytes
             while self.current_cache_bytes + arr_bytes > self.max_cache_bytes and self.tensor_lru_cache:
                 k, evicted_arr = self.tensor_lru_cache.popitem(last=False)
@@ -201,8 +194,7 @@ class ZeroCopyMoEEngine:
             self.tensor_lru_cache[tensor_name] = arr
             self.current_cache_bytes += arr_bytes
             return arr
-        except Exception as e:
-            print(f"[ZeroCopy-Infer] Notice fetching '{tensor_name}': {e}")
+        except Exception:
             return None
 
     def fetch_mxfp4_weight_tensor(self, base_name: str, fallback_shape: Tuple[int, ...]) -> Optional[np.ndarray]:
@@ -319,7 +311,23 @@ class ZeroCopyMoEEngine:
         W_gate = self.fetch_weight_tensor(gate_tensor_name, (self.config.num_experts, self.hidden_dim))
         
         if W_gate is None:
-            return hidden_states  # Skip MoE if gate router is not in indexed shards
+            # Check if layer is a Dense MLP (Gemma 4, Qwen 2.5, Llama, Mistral)
+            gate_name = f"model.layers.{layer_idx}.mlp.gate_proj.weight"
+            up_name = f"model.layers.{layer_idx}.mlp.up_proj.weight"
+            down_name = f"model.layers.{layer_idx}.mlp.down_proj.weight"
+
+            W1 = self.fetch_weight_tensor(gate_name, (self.moe_inter, self.hidden_dim))
+            W3 = self.fetch_weight_tensor(up_name, (self.moe_inter, self.hidden_dim))
+            W2 = self.fetch_weight_tensor(down_name, (self.hidden_dim, self.moe_inter))
+
+            if W1 is not None and W2 is not None and W3 is not None:
+                gate_proj = self.silu(self.linear_proj(W1, normed))
+                up_proj = self.linear_proj(W3, normed)
+                mlp_out = self.linear_proj(W2, gate_proj * up_proj)
+                if mlp_out.shape[0] != hidden_states.shape[0]:
+                    mlp_out = np.pad(mlp_out, (0, max(0, hidden_states.shape[0] - mlp_out.shape[0])))[:hidden_states.shape[0]]
+                return hidden_states + mlp_out
+            return hidden_states  # Skip if neither MoE nor Dense MLP is present
         
         # Router Logits with Sigmoid Router Activation (config.json)
         router_logits = self.linear_proj(W_gate, normed)

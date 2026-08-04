@@ -59,6 +59,8 @@ class SafetensorsRangeStreamer:
         self.tensor_map: Dict[str, Dict[str, Any]] = {}
         self.shard_index: Dict[str, str] = {}  # Maps tensor_name -> shard_filename
         self.parsed_shards: set = set()
+        self.total_bytes_streamed: int = 0
+        self.total_range_requests: int = 0
         self.base_url = f"https://huggingface.co/{repo_id}/resolve/main"
 
     def fetch_remote_config(self) -> Dict[str, Any]:
@@ -341,6 +343,8 @@ class SafetensorsRangeStreamer:
             
             try:
                 raw_bytes = self.client.fetch_range(meta["shard_url"], start_byte, end_byte)
+                self.total_bytes_streamed += len(raw_bytes)
+                self.total_range_requests += 1
                 
                 if meta["dtype"] == "BF16":
                     u16 = np.frombuffer(raw_bytes, dtype=np.uint16)
