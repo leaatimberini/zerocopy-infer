@@ -6,17 +6,19 @@ Authored by Leandro Emanuel Timberini (Investigador Independiente — Ituzaingó
 
 from .hf_range_stream import SafetensorsRangeStreamer
 from .tokenizer import ZeroCopyKimiTokenizer, ZeroCopyKimiTokenizer as ZeroCopyTokenizer
+from .tokenization_kimi import TikTokenTokenizer
 from .moe_inference_engine import ZeroCopyMoEEngine, KimiK3Config
 from .media_utils import navit_resize_image, navit_patchify, normalize_image
 from .modeling_kimi_k3 import KimiK3ForConditionalGeneration, PatchMergerMLPV2
 from .modeling_kimi_linear import SituAndMul, KimiMoEGate, ShortConvolution1D
 
-__version__ = "0.7.5"
+__version__ = "0.8.0"
 __author__ = "Leandro Emanuel Timberini"
 __all__ = [
     "SafetensorsRangeStreamer",
     "ZeroCopyKimiTokenizer",
     "ZeroCopyTokenizer",
+    "TikTokenTokenizer",
     "ZeroCopyMoEEngine",
     "KimiK3Config",
     "KimiK3ForConditionalGeneration",
