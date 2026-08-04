@@ -1,11 +1,12 @@
 """
-ZeroCopy-Infer: Official Kimi K3 TikToken BPE Tokenizer & XTML Prompt Renderer
-===============================================================================
+ZeroCopy-Infer: Official Kimi K3 TikToken BPE Tokenizer & Multimodal XTML Renderer
+==================================================================================
 Authored by Leandro Emanuel Timberini (Investigador Independiente — Ituzaingó, Buenos Aires, Argentina).
 
 Loads and parses Moonshot AI's official Kimi-K3 tiktoken.model directly from Hugging Face LFS
 via HTTP Range / streaming into RAM memory with 0 Bytes written to local disk storage.
-Includes official XTML (<|open|>, <|close|>, <|sep|>, <|end_of_msg|>) prompt rendering.
+Includes official XTML prompt rendering and NaViT multimodal image prompt construction:
+<|media_begin|>image {width}x{height}<|media_content|><|media_pad|><|media_end|>
 """
 
 import base64
@@ -19,9 +20,14 @@ SEP_TOKEN = "<|sep|>"
 END_OF_MSG_TOKEN = "<|end_of_msg|>"
 IMAGE_PLACEHOLDER = "<|kimi_image_placeholder|>"
 
+MEDIA_BEGIN_TOKEN = "<|media_begin|>"
+MEDIA_CONTENT_TOKEN = "<|media_content|>"
+MEDIA_PAD_TOKEN = "<|media_pad|>"
+MEDIA_END_TOKEN = "<|media_end|>"
+
 class ZeroCopyKimiTokenizer:
     """
-    Official Kimi-K3 TikToken BPE Tokenizer and XTML Renderer.
+    Official Kimi-K3 TikToken BPE Tokenizer, XTML Renderer & Multimodal Image Prompt Builder.
     """
     TIKTOKEN_MODEL_URL = "https://huggingface.co/moonshotai/Kimi-K3/resolve/main/tiktoken.model"
 
@@ -33,7 +39,7 @@ class ZeroCopyKimiTokenizer:
         self.clean_latin_ranks: List[int] = []
         self.complete_word_ranks: List[int] = []
         
-        # Special Tokens defined in configuration_kimi_k3 & encoding_k3.py
+        # Special Tokens defined in configuration_kimi_k3 & kimi_k3_vision_processing.py
         self.special_tokens: Dict[str, int] = {
             "[BOS]": 163584,
             "[EOS]": 163585,
@@ -44,6 +50,10 @@ class ZeroCopyKimiTokenizer:
             "[start_header_id]": 163590,
             "[end_header_id]": 163591,
             "[EOT]": 163593,
+            "<|media_begin|>": 163600,
+            "<|media_content|>": 163601,
+            "<|media_pad|>": 163602,
+            "<|media_end|>": 163603,
             "<|kimi_image_placeholder|>": 163605,
             "[UNK]": 163838,
             "[PAD]": 163839,
@@ -64,7 +74,7 @@ class ZeroCopyKimiTokenizer:
         """
         Stream tiktoken.model directly into RAM and populate token mappings.
         """
-        headers = {"User-Agent": "ZeroCopy-Infer/0.6.2 (Leandro Timberini AGI Engine)"}
+        headers = {"User-Agent": "ZeroCopy-Infer/0.6.3 (Leandro Timberini AGI Engine)"}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
 
@@ -126,12 +136,22 @@ class ZeroCopyKimiTokenizer:
 
         self.is_loaded = True
 
-    def render_xtml_chat_prompt(self, user_prompt: str, thinking: bool = False) -> str:
+    @staticmethod
+    def make_image_prompt(width: int, height: int) -> str:
         """
-        Renders official Kimi-K3 XTML format prompt as defined in encoding_k3.py:
-        <|open|>message role="user"<|sep|>{user_prompt}<|close|>message<|sep|><|end_of_msg|>
-        <|open|>message role="assistant"<|sep|><|open|>response<|sep|>
+        Builds official Kimi-K3 NaViT image placeholder with resolution info (kimi_k3_vision_processing.py).
         """
+        return f"{MEDIA_BEGIN_TOKEN}image {width}x{height}{MEDIA_CONTENT_TOKEN}{MEDIA_PAD_TOKEN}{MEDIA_END_TOKEN}"
+
+    def render_xtml_chat_prompt(self, user_prompt: str, image_size: Optional[Tuple[int, int]] = None, thinking: bool = False) -> str:
+        """
+        Renders official Kimi-K3 XTML format prompt with optional NaViT vision media header.
+        """
+        if image_size:
+            w, h = image_size
+            media_header = self.make_image_prompt(w, h)
+            user_prompt = f"{media_header}\n{user_prompt}"
+            
         user_msg = f"{OPEN_TOKEN}message role=\"user\"{SEP_TOKEN}{user_prompt}{CLOSE_TOKEN}message{SEP_TOKEN}{END_OF_MSG_TOKEN}\n"
         if thinking:
             assistant_gen = f"{OPEN_TOKEN}message role=\"assistant\"{SEP_TOKEN}{OPEN_TOKEN}think{SEP_TOKEN}"
