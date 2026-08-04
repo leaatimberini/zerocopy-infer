@@ -385,11 +385,9 @@ class ZeroCopyMoEEngine:
         """
         Executes Official Kimi-K3 Real Safetensors Forward-Pass Stream with XTML Prompt Formatting.
         """
-        self.chat_history.append({"role": "user", "content": user_prompt})
-        
-        # Format user prompt with official Kimi-K3 XTML tags (encoding_k3.py)
-        xtml_prompt = self.tokenizer.render_xtml_chat_prompt(user_prompt, thinking=False)
-        input_token_ids = self.tokenizer.encode(xtml_prompt)
+        # Format user prompt dynamically for target model (Gemma, MiMo, Kimi, DeepSeek, Qwen, Mixtral)
+        chat_prompt = self.tokenizer.render_chat_prompt(user_prompt, self.streamer.repo_id)
+        input_token_ids = self.tokenizer.encode(chat_prompt)
         if not input_token_ids:
             input_token_ids = [self.config.bos_token_id, 1000]
             

@@ -1,6 +1,6 @@
 """
-ZeroCopy-Infer: Interactive Terminal Model Selector & Inference Launcher
-========================================================================
+ZeroCopy-Infer: Universal Interactive Terminal Model Selector & Inference Launcher
+==================================================================================
 Authored by Leandro Emanuel Timberini (Investigador Independiente — Ituzaingó, Buenos Aires, Argentina).
 """
 
@@ -14,26 +14,36 @@ from .moe_inference_engine import ZeroCopyMoEEngine, KimiK3Config
 
 PRESET_MODELS: Dict[int, Dict[str, str]] = {
     1: {
+        "name": "Google — Gemma 4 26B A4B Instruct (MoE & Hybrid Attention)",
+        "repo_id": "google/gemma-4-26B-A4B-it",
+        "description": "Google's State-of-the-Art Gemma 4 26B Architecture",
+    },
+    2: {
+        "name": "Google — Gemma 4 31B Instruct (Dense Flagship Model)",
+        "repo_id": "google/gemma-4-31B-it",
+        "description": "Google's Gemma 4 31B High-Precision Reasoning LLM",
+    },
+    3: {
         "name": "Moonshot AI — Kimi K3 (2.78-Trillion Parameters, 896 Experts)",
         "repo_id": "moonshotai/Kimi-K3",
         "description": "Massive MoE with KDA Delta Attention & MXFP4 Microscaling",
     },
-    2: {
+    4: {
         "name": "Xiaomi — MiMo V2.5 Pro (State-of-the-Art MoE)",
         "repo_id": "XiaomiMiMo/MiMo-V2.5-Pro",
         "description": "Xiaomi's Flagship MoE Language & Reasoning Model",
     },
-    3: {
+    5: {
         "name": "DeepSeek — DeepSeek V3 (671-Billion Parameters, 256 Experts)",
         "repo_id": "deepseek-ai/DeepSeek-V3",
         "description": "DeepSeek Multi-Head Latent Attention & Sparse MoE",
     },
-    4: {
-        "name": "Qwen — Qwen2.5 1.5B Instruct (Dense Fast Inference)",
+    6: {
+        "name": "Qwen — Qwen2.5 1.5B Instruct (Dense Fast Mobile)",
         "repo_id": "Qwen/Qwen2.5-1.5B-Instruct",
         "description": "Compact Alibaba Cloud LLM for ultra-fast mobile testing",
     },
-    5: {
+    7: {
         "name": "Mistral AI — Mixtral 8x7B Instruct (Sparse MoE)",
         "repo_id": "mistralai/Mixtral-8x7B-Instruct-v0.1",
         "description": "Classic 8x7B Sparse Mixture-of-Experts",
@@ -60,10 +70,10 @@ def main():
     for key, info in PRESET_MODELS.items():
         print(f" [{key}] {info['name']}")
         print(f"     HF Repo: {info['repo_id']} | {info['description']}")
-    print(" [6] ✏️  Ingresar repositorio personalizado de Hugging Face (Custom Repo ID)")
+    print(" [8] ✏️  Ingresar repositorio personalizado de Hugging Face (Custom Repo ID)")
     print("--------------------------------------------------------------------------------")
 
-    choice_raw = input("\nIngresa tu opción [1-6] (por defecto 1): ").strip()
+    choice_raw = input("\nIngresa tu opción [1-8] (por defecto 1): ").strip()
     if not choice_raw:
         choice = 1
     else:
@@ -75,10 +85,10 @@ def main():
     if choice in PRESET_MODELS:
         selected_repo = PRESET_MODELS[choice]["repo_id"]
         selected_name = PRESET_MODELS[choice]["name"]
-    elif choice == 6:
+    elif choice == 8:
         selected_repo = input("Ingresa el ID del repositorio en Hugging Face (ej. org/model): ").strip()
         if not selected_repo:
-            selected_repo = "moonshotai/Kimi-K3"
+            selected_repo = "google/gemma-4-26B-A4B-it"
         selected_name = f"Custom: {selected_repo}"
     else:
         selected_repo = PRESET_MODELS[1]["repo_id"]
@@ -118,7 +128,7 @@ def main():
 
     model_config = KimiK3Config.from_remote_dict(remote_cfg)
 
-    print(f"\n[2/3] Step 2: Inicializando Motor MoE ZeroCopy...")
+    print(f"\n[2/3] Step 2: Inicializando Motor MoE/LLM ZeroCopy...")
     engine = ZeroCopyMoEEngine(
         streamer=streamer,
         config=model_config,

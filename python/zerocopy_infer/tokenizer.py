@@ -1,12 +1,15 @@
 """
-ZeroCopy-Infer: Official Kimi K3 TikToken BPE Tokenizer & Multimodal XTML Renderer
-==================================================================================
+ZeroCopy-Infer: Universal Hugging Face Tokenizer & Chat Template Renderer
+========================================================================
 Authored by Leandro Emanuel Timberini (Investigador Independiente — Ituzaingó, Buenos Aires, Argentina).
 
-Loads and parses Moonshot AI's official Kimi-K3 tiktoken.model directly from Hugging Face LFS
-via HTTP Range / streaming into RAM memory with 0 Bytes written to local disk storage.
-Includes official XTML prompt rendering and NaViT multimodal image prompt construction:
-<|media_begin|>image {width}x{height}<|media_content|><|media_pad|><|media_end|>
+Supports native remote streaming of tokenizers directly from Hugging Face LFS / CDN into RAM:
+- Gemma 4 (Google) -> SentencePiece / Gemma Chat (<start_of_turn>user\n...<end_of_turn>\n<start_of_turn>model\n)
+- MiMo V2.5 Pro (Xiaomi) -> ChatML (<|im_start|>user\n...<|im_end|>\n<|im_start|>assistant\n)
+- Kimi K3 (Moonshot AI) -> TikToken BPE + XTML (<|open|>message role="user"<|sep|>)
+- DeepSeek V3 (DeepSeek) -> DeepSeek Chat (<｜User｜>...<｜Assistant｜>)
+- Qwen 2.5 (Alibaba) -> ChatML (<|im_start|>user\n...<|im_end|>\n<|im_start|>assistant\n)
+- Mixtral / Mistral -> Mistral ([INST] ... [/INST])
 """
 
 import base64
@@ -18,19 +21,17 @@ OPEN_TOKEN = "<|open|>"
 CLOSE_TOKEN = "<|close|>"
 SEP_TOKEN = "<|sep|>"
 END_OF_MSG_TOKEN = "<|end_of_msg|>"
-IMAGE_PLACEHOLDER = "<|kimi_image_placeholder|>"
 
 MEDIA_BEGIN_TOKEN = "<|media_begin|>"
 MEDIA_CONTENT_TOKEN = "<|media_content|>"
 MEDIA_PAD_TOKEN = "<|media_pad|>"
 MEDIA_END_TOKEN = "<|media_end|>"
 
-class ZeroCopyKimiTokenizer:
+class UniversalHFTokenizer:
     """
-    Official Kimi-K3 TikToken BPE Tokenizer, XTML Renderer & Multimodal Image Prompt Builder.
+    Universal Hugging Face Zero-Disk Tokenizer & Multi-Model Chat Template Renderer.
+    Streams tokenizer.json / tiktoken.model directly from HF into RAM.
     """
-    TIKTOKEN_MODEL_URL = "https://huggingface.co/moonshotai/Kimi-K3/resolve/main/tiktoken.model"
-
     def __init__(self, repo_id: str = "moonshotai/Kimi-K3", token: Optional[str] = None):
         self.repo_id = repo_id
         self.token = token
@@ -38,28 +39,11 @@ class ZeroCopyKimiTokenizer:
         self.decoder: Dict[int, bytes] = {}
         self.clean_latin_ranks: List[int] = []
         self.complete_word_ranks: List[int] = []
-        
-        # Special Tokens defined in configuration_kimi_k3 & kimi_k3_vision_processing.py
-        self.special_tokens: Dict[str, int] = {
-            "[BOS]": 163584,
-            "[EOS]": 163585,
-            "<|end_of_msg|>": 163586,
-            "<|open|>": 163587,
-            "<|close|>": 163588,
-            "<|sep|>": 163589,
-            "[start_header_id]": 163590,
-            "[end_header_id]": 163591,
-            "[EOT]": 163593,
-            "<|media_begin|>": 163602,
-            "<|media_content|>": 163603,
-            "<|media_end|>": 163604,
-            "<|media_pad|>": 163605,
-            "<osagent_mode>": 163649,
-            "[UNK]": 163838,
-            "[PAD]": 163839,
-        }
+        self.special_tokens: Dict[str, int] = {}
         self.is_loaded = False
-        self._load_official_kimi_vocab()
+        
+        self.base_url = f"https://huggingface.co/{repo_id}/resolve/main"
+        self._load_tokenizer()
 
     def _is_clean_latin(self, token_str: str) -> bool:
         if not token_str:
@@ -70,17 +54,57 @@ class ZeroCopyKimiTokenizer:
                 return False
         return True
 
-    def _load_official_kimi_vocab(self):
+    def _load_tokenizer(self):
         """
-        Stream tiktoken.model directly into RAM and populate token mappings.
+        Attempts to load tokenizer.json or tiktoken.model from HF repository into RAM.
         """
-        headers = {"User-Agent": "ZeroCopy-Infer/0.6.3 (Leandro Timberini AGI Engine)"}
+        headers = {"User-Agent": "ZeroCopy-Infer/0.9.5 (Leandro Timberini AGI Engine)"}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
 
+        # 1. Try fetching tokenizer.json (Standard for Gemma, Qwen, DeepSeek, Xiaomi MiMo)
+        tokenizer_json_url = f"{self.base_url}/tokenizer.json"
         try:
-            print(f"[KimiTokenizer] Fetching official Kimi-K3 tiktoken.model from Hugging Face LFS...")
-            req = urllib.request.Request(self.TIKTOKEN_MODEL_URL, headers=headers)
+            print(f"[UniversalTokenizer] Attempting to load tokenizer.json from {self.repo_id}...")
+            req = urllib.request.Request(tokenizer_json_url, headers=headers)
+            with urllib.request.urlopen(req, timeout=10.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                vocab = {}
+                model_sec = data.get("model", {})
+                if "vocab" in model_sec:
+                    vocab = model_sec["vocab"]
+                elif "vocab" in data:
+                    vocab = data["vocab"]
+
+                for token_str, tid in vocab.items():
+                    b_token = token_str.encode("utf-8")
+                    self.encoder[b_token] = tid
+                    self.decoder[tid] = b_token
+                    if self._is_clean_latin(token_str):
+                        self.clean_latin_ranks.append(tid)
+                        stripped = token_str.strip()
+                        if len(stripped) >= 2 and stripped.isalnum():
+                            self.complete_word_ranks.append(tid)
+
+                added_tokens = data.get("added_tokens", [])
+                for item in added_tokens:
+                    if isinstance(item, dict):
+                        t_content = item.get("content", "")
+                        t_id = item.get("id")
+                        if t_content and t_id is not None:
+                            self.special_tokens[t_content] = t_id
+
+                self.is_loaded = True
+                print(f"[UniversalTokenizer] Loaded {len(self.encoder)} tokens from tokenizer.json ({len(self.complete_word_ranks)} Latin words) into RAM!")
+                return
+        except Exception as e:
+            print(f"[UniversalTokenizer] tokenizer.json notice ({e}). Checking alternative formats...")
+
+        # 2. Try fetching tiktoken.model (For Moonshot Kimi K3)
+        tiktoken_url = f"{self.base_url}/tiktoken.model"
+        try:
+            print(f"[UniversalTokenizer] Attempting to load tiktoken.model from {self.repo_id}...")
+            req = urllib.request.Request(tiktoken_url, headers=headers)
             with urllib.request.urlopen(req, timeout=10.0) as resp:
                 content = resp.read().decode("utf-8", errors="ignore")
                 for line in content.splitlines():
@@ -94,22 +118,23 @@ class ZeroCopyKimiTokenizer:
                             token_bytes = base64.b64decode(b64_token)
                             rank = int(rank_str)
                             token_str = token_bytes.decode("utf-8", errors="ignore")
-                            
                             self.encoder[token_bytes] = rank
                             self.decoder[rank] = token_bytes
-                            
                             if self._is_clean_latin(token_str):
                                 self.clean_latin_ranks.append(rank)
-                                clean_stripped = token_str.strip()
-                                if len(clean_stripped) >= 2 and clean_stripped.isalnum() and rank >= 500:
+                                stripped = token_str.strip()
+                                if len(stripped) >= 2 and stripped.isalnum() and rank >= 500:
                                     self.complete_word_ranks.append(rank)
                         except Exception:
                             continue
                 self.is_loaded = True
-                print(f"[KimiTokenizer] Successfully loaded {len(self.encoder)} BPE tokens ({len(self.complete_word_ranks)} complete Spanish/Latin words) into RAM (0 Bytes on disk).")
+                print(f"[UniversalTokenizer] Loaded {len(self.encoder)} BPE tokens from tiktoken.model into RAM!")
+                return
         except Exception as e:
-            print(f"[KimiTokenizer] Notice loading live LFS model ({e}). Populating core BPE vocabulary...")
-            self._populate_core_bpe_vocab()
+            print(f"[UniversalTokenizer] tiktoken.model notice ({e}). Populating fallback vocabulary...")
+
+        # 3. Fallback core BPE vocabulary
+        self._populate_core_bpe_vocab()
 
     def _populate_core_bpe_vocab(self):
         for i in range(32, 127):
@@ -121,9 +146,8 @@ class ZeroCopyKimiTokenizer:
         common_words = [
             "el", "la", "los", "las", "un", "una", "es", "son", "de", "en", "por", "para",
             "con", "sin", "sobre", "entre", "que", "se", "su", "sus", "al", "del", "este", "esta",
-            "inteligencia", "artificial", "motor", "sistema", "modelo", "datos", "RAM", "inferencia", "Kimi", "K3",
-            "Leandro", "Timberini", "Argentina", "Ituzaingó", "respuesta", "proceso", "información", "tiempo", "real",
-            "reina", "consorte", "Países", "Bajos", "Máxima", "Zorreguieta", "Guillermo", "Alejandro", "Fórmula", "Williams", "Racing"
+            "inteligencia", "artificial", "motor", "sistema", "modelo", "datos", "RAM", "inferencia",
+            "respuesta", "proceso", "información", "tiempo", "real", "Gemma", "Kimi", "MiMo", "DeepSeek"
         ]
         
         for idx, w in enumerate(common_words):
@@ -136,40 +160,42 @@ class ZeroCopyKimiTokenizer:
 
         self.is_loaded = True
 
-    @staticmethod
-    def make_image_prompt(width: int, height: int) -> str:
+    def render_chat_prompt(self, user_prompt: str, repo_id: Optional[str] = None) -> str:
         """
-        Builds official Kimi-K3 NaViT image placeholder with resolution info (kimi_k3_vision_processing.py).
+        Renders exact Chat Template for the target model family:
+        - Gemma 4 (Google): <start_of_turn>user\n...<end_of_turn>\n<start_of_turn>model\n
+        - Xiaomi MiMo / Qwen: <|im_start|>user\n...<|im_end|>\n<|im_start|>assistant\n
+        - DeepSeek: <｜User｜>...<｜Assistant｜>
+        - Mistral: [INST] ... [/INST]
+        - Kimi K3: XTML format
         """
-        return f"{MEDIA_BEGIN_TOKEN}image {width}x{height}{MEDIA_CONTENT_TOKEN}{MEDIA_PAD_TOKEN}{MEDIA_END_TOKEN}"
+        target_repo = (repo_id or self.repo_id).lower()
+        
+        if "gemma" in target_repo:
+            return f"<start_of_turn>user\n{user_prompt}<end_of_turn>\n<start_of_turn>model\n"
+        elif "qwen" in target_repo or "mimo" in target_repo:
+            return f"<|im_start|>user\n{user_prompt}<|im_end|>\n<|im_start|>assistant\n"
+        elif "deepseek" in target_repo:
+            return f"<｜User｜>{user_prompt}<｜Assistant｜>"
+        elif "mixtral" in target_repo or "mistral" in target_repo:
+            return f"[INST] {user_prompt} [/INST]"
+        else:
+            # Default XTML format for Kimi-K3
+            return self.render_xtml_chat_prompt(user_prompt, thinking=False)
 
     def render_xtml_chat_prompt(self, user_prompt: str, image_size: Optional[Tuple[int, int]] = None, thinking: bool = False) -> str:
-        """
-        Renders official Kimi-K3 XTML format prompt with optional NaViT vision media header.
-        """
-        if image_size:
-            w, h = image_size
-            media_header = self.make_image_prompt(w, h)
-            user_prompt = f"{media_header}\n{user_prompt}"
-            
         user_msg = f"{OPEN_TOKEN}message role=\"user\"{SEP_TOKEN}{user_prompt}{CLOSE_TOKEN}message{SEP_TOKEN}{END_OF_MSG_TOKEN}\n"
         if thinking:
             assistant_gen = f"{OPEN_TOKEN}message role=\"assistant\"{SEP_TOKEN}{OPEN_TOKEN}think{SEP_TOKEN}"
         else:
             assistant_gen = f"{OPEN_TOKEN}message role=\"assistant\"{SEP_TOKEN}{OPEN_TOKEN}response{SEP_TOKEN}"
-            
         return user_msg + assistant_gen
 
     def encode(self, text: str) -> List[int]:
-        """
-        Encodes arbitrary text or XTML tags into official Kimi-K3 BPE token IDs.
-        """
         if not text:
             return []
-
         text_bytes = text.encode("utf-8")
         tokens = []
-        
         i = 0
         n = len(text_bytes)
         while i < n:
@@ -185,13 +211,9 @@ class ZeroCopyKimiTokenizer:
                 b = bytes([text_bytes[i]])
                 tokens.append(self.encoder.get(b, text_bytes[i]))
                 i += 1
-                
         return tokens
 
     def decode(self, token_ids: List[int]) -> str:
-        """
-        Decodes official Kimi-K3 BPE token IDs back into string text.
-        """
         res_bytes = bytearray()
         for tid in token_ids:
             if tid in self.decoder:
@@ -204,3 +226,7 @@ class ZeroCopyKimiTokenizer:
 
     def decode_token(self, token_id: int) -> str:
         return self.decode([token_id])
+
+# Alias for backward compatibility
+ZeroCopyKimiTokenizer = UniversalHFTokenizer
+ZeroCopyTokenizer = UniversalHFTokenizer
