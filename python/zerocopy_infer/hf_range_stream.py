@@ -208,3 +208,83 @@ class SafetensorsRangeStreamer:
             return np.frombuffer(raw_bytes, dtype=np.float16).reshape(num_rows, actual_hidden).astype(np.float32)
         else:
             return np.frombuffer(raw_bytes, dtype=np.float32).reshape(num_rows, actual_hidden)
+
+    def fetch_sparse_embedding_matrix(
+        self, token_ids: List[int], hidden_dim: int = 7168, max_gap_rows: int = 250
+    ) -> Tuple[Optional[np.ndarray], List[int]]:
+        """
+        Stream embeddings for an arbitrary set of token IDs (e.g. Spanish vocabulary)
+        by clustering nearby token IDs into a minimal set of HTTP Range Requests.
+        
+        Returns (embedding_matrix [N, hidden_dim], active_token_ids [N]).
+        """
+        embed_key = "language_model.model.embed_tokens.weight"
+        if embed_key not in self.tensor_map:
+            embed_key = "model.embed_tokens.weight"
+        if embed_key not in self.tensor_map:
+            return None, []
+
+        meta = self.tensor_map[embed_key]
+        vocab_size = meta["shape"][0]
+        actual_hidden = meta["shape"][1] if len(meta["shape"]) > 1 else hidden_dim
+        
+        # Filter and sort unique valid token IDs
+        valid_ids = sorted(list(set(tid for tid in token_ids if 0 <= tid < vocab_size)))
+        if not valid_ids:
+            return None, []
+            
+        bytes_per_element = 2 if meta["dtype"] in ("BF16", "F16") else 4
+        row_bytes = actual_hidden * bytes_per_element
+
+        # Group adjacent/nearby token IDs into clusters
+        clusters: List[List[int]] = []
+        current_cluster: List[int] = [valid_ids[0]]
+        
+        for tid in valid_ids[1:]:
+            if tid - current_cluster[-1] <= max_gap_rows:
+                current_cluster.append(tid)
+            else:
+                clusters.append(current_cluster)
+                current_cluster = [tid]
+        if current_cluster:
+            clusters.append(current_cluster)
+
+        print(f"[ZeroCopy-Infer] Streaming Spanish vocabulary embeddings ({len(valid_ids)} tokens across {len(clusters)} clusters)...")
+        
+        result_embeddings: List[np.ndarray] = []
+        final_token_ids: List[int] = []
+
+        for cluster in clusters:
+            start_row = cluster[0]
+            end_row = cluster[-1]
+            num_rows = end_row - start_row + 1
+            
+            start_byte = meta["start_byte"] + start_row * row_bytes
+            end_byte = start_byte + num_rows * row_bytes - 1
+            
+            try:
+                raw_bytes = self.client.fetch_range(meta["shard_url"], start_byte, end_byte)
+                
+                if meta["dtype"] == "BF16":
+                    u16 = np.frombuffer(raw_bytes, dtype=np.uint16)
+                    u32 = u16.astype(np.uint32) << 16
+                    block = u32.view(np.float32).reshape(num_rows, actual_hidden)
+                elif meta["dtype"] == "F16":
+                    block = np.frombuffer(raw_bytes, dtype=np.float16).reshape(num_rows, actual_hidden).astype(np.float32)
+                else:
+                    block = np.frombuffer(raw_bytes, dtype=np.float32).reshape(num_rows, actual_hidden)
+
+                for tid in cluster:
+                    row_offset = tid - start_row
+                    result_embeddings.append(block[row_offset])
+                    final_token_ids.append(tid)
+            except Exception as e:
+                print(f"[ZeroCopy-Infer] Notice fetching cluster [{start_row}-{end_row}]: {e}")
+                continue
+
+        if not result_embeddings:
+            return None, []
+
+        matrix = np.vstack(result_embeddings).astype(np.float32)
+        print(f"[ZeroCopy-Infer] Successfully loaded Spanish vocabulary matrix: shape {matrix.shape} ({matrix.nbytes / (1024*1024):.1f} MB in RAM).")
+        return matrix, final_token_ids

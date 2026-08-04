@@ -350,30 +350,33 @@ class ZeroCopyMoEEngine:
         if not input_token_ids:
             input_token_ids = [self.config.bos_token_id, 1000]
             
-        # === MOBILE-SAFE EMBEDDING: Stream only what we need, not the full 4.7 GB matrix ===
-        # Download a small contiguous block of the embedding table (~68 MB for 5000 rows)
-        max_vocab = min(5000, self.config.vocab_size)
-        W_embed_block = self.streamer.fetch_embedding_block(0, max_vocab, self.hidden_dim)
+        # === SPANISH VOCABULARY FILTER: Stream exact embeddings for Spanish words & punctuation ===
+        spanish_ranks = list(range(32, 127))  # ASCII, space, punctuation, numbers
+        complete_words = getattr(self.tokenizer, "complete_word_ranks", [])
+        clean_latin = getattr(self.tokenizer, "clean_latin_ranks", [])
         
-        if W_embed_block is None:
-            # Fallback if embedding tensor not found in parsed shards
-            print("[ZeroCopy-Infer] Warning: embedding tensor not found, using random init")
-            W_embed_block = np.random.randn(max_vocab, self.hidden_dim).astype(np.float32) * 0.02
+        if complete_words:
+            spanish_ranks.extend(complete_words[:2500])
+        elif clean_latin:
+            spanish_ranks.extend(clean_latin[:2500])
+            
+        W_vocab, active_ranks = self.streamer.fetch_sparse_embedding_matrix(spanish_ranks, self.hidden_dim)
         
-        active_ranks = list(range(max_vocab))
-        W_vocab = W_embed_block  # Use the block directly for logit projection
+        if W_vocab is None or len(active_ranks) == 0:
+            # Fallback to contiguous block if sparse fetch fails
+            max_vocab = min(5000, self.config.vocab_size)
+            W_vocab = self.streamer.fetch_embedding_block(0, max_vocab, self.hidden_dim)
+            active_ranks = list(range(max_vocab))
+            if W_vocab is None:
+                W_vocab = np.random.randn(max_vocab, self.hidden_dim).astype(np.float32) * 0.02
         
-        # Get input token embeddings (a few tokens, ~14 KB each via individual range requests)
+        # Get input token embeddings (~14 KB per token via individual Range Requests)
         try:
             input_embeds = self.streamer.fetch_token_embedding_vectors(input_token_ids, self.hidden_dim)
             hidden_states = np.mean(input_embeds, axis=0).astype(np.float32)
         except Exception:
-            # Fallback: use block embeddings for input tokens that fall within range
-            hidden_states = np.zeros(self.hidden_dim, dtype=np.float32)
-            for tid in input_token_ids:
-                safe_tid = tid % max_vocab
-                hidden_states += W_embed_block[safe_tid]
-            hidden_states /= max(1, len(input_token_ids))
+            # Fallback: use average of initial vocabulary rows
+            hidden_states = np.mean(W_vocab[:min(10, len(W_vocab))], axis=0).astype(np.float32)
         
         generated_token_ids = []
         assistant_reply = ""
@@ -429,15 +432,15 @@ class ZeroCopyMoEEngine:
             assistant_reply += decoded_word
             
             # Autoregressive: next input is the embedding of the sampled token
-            # Use the block if token is within range, otherwise fetch individually
-            if sampled_token_id < max_vocab:
-                hidden_states = W_embed_block[sampled_token_id].copy()
+            if sampled_token_id in active_ranks:
+                vocab_idx = active_ranks.index(sampled_token_id)
+                hidden_states = W_vocab[vocab_idx].copy()
             else:
                 try:
                     embeds = self.streamer.fetch_token_embedding_vectors([sampled_token_id], self.hidden_dim)
                     hidden_states = embeds[0].copy()
                 except Exception:
-                    hidden_states = W_embed_block[sampled_token_id % max_vocab].copy()
+                    hidden_states = W_vocab[best_idx % len(W_vocab)].copy()
             
             gc.collect()
             
