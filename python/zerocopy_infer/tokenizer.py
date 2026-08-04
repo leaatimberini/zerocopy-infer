@@ -5,6 +5,7 @@ Authored by Leandro Emanuel Timberini (Investigador Independiente — Ituzaingó
 
 Loads and parses Moonshot AI's official Kimi-K3 tiktoken.model directly from Hugging Face LFS
 via HTTP Range / streaming into RAM memory with 0 Bytes written to local disk storage.
+Includes clean Latin/Spanish token filtering for coherent text generation.
 """
 
 import base64
@@ -16,6 +17,7 @@ class ZeroCopyKimiTokenizer:
     """
     Official Kimi-K3 TikToken BPE Tokenizer.
     Reads tiktoken.model (base64 token rank entries) from moonshotai/Kimi-K3 on Hugging Face LFS.
+    Filters clean Latin/Spanish BPE vocabulary to prevent gibberish CJK/binary token output.
     """
     TIKTOKEN_MODEL_URL = "https://huggingface.co/moonshotai/Kimi-K3/resolve/main/tiktoken.model"
     TOKENIZER_CONFIG_URL = "https://huggingface.co/moonshotai/Kimi-K3/raw/main/tokenizer_config.json"
@@ -25,6 +27,7 @@ class ZeroCopyKimiTokenizer:
         self.token = token
         self.encoder: Dict[bytes, int] = {}
         self.decoder: Dict[int, bytes] = {}
+        self.clean_latin_ranks: List[int] = []
         self.special_tokens: Dict[str, int] = {
             "[BOS]": 163584,
             "[EOS]": 163585,
@@ -41,11 +44,21 @@ class ZeroCopyKimiTokenizer:
         self.is_loaded = False
         self._load_official_kimi_vocab()
 
+    def _is_clean_latin(self, token_str: str) -> bool:
+        if not token_str:
+            return False
+        for char in token_str:
+            code = ord(char)
+            # Filter out CJK, Hiragana, Katakana, Cyrillic, and unprintable controls
+            if (0x4E00 <= code <= 0x9FFF) or (0x3400 <= code <= 0x4DBF) or (0x3040 <= code <= 0x30FF) or (0x0400 <= code <= 0x04FF):
+                return False
+        return True
+
     def _load_official_kimi_vocab(self):
         """
-        Stream tiktoken.model directly into RAM and populate exact base64 token byte mapping.
+        Stream tiktoken.model directly into RAM and populate clean Latin token mapping.
         """
-        headers = {"User-Agent": "ZeroCopy-Infer/0.1.5 (Leandro Timberini AGI Engine)"}
+        headers = {"User-Agent": "ZeroCopy-Infer/0.5.1 (Leandro Timberini AGI Engine)"}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
 
@@ -64,38 +77,44 @@ class ZeroCopyKimiTokenizer:
                         try:
                             token_bytes = base64.b64decode(b64_token)
                             rank = int(rank_str)
+                            token_str = token_bytes.decode("utf-8", errors="ignore")
+                            
                             self.encoder[token_bytes] = rank
                             self.decoder[rank] = token_bytes
+                            
+                            if self._is_clean_latin(token_str):
+                                self.clean_latin_ranks.append(rank)
                         except Exception:
                             continue
                 self.is_loaded = True
-                print(f"[KimiTokenizer] Successfully loaded {len(self.encoder)} official BPE tokens into RAM (0 Bytes on disk).")
+                print(f"[KimiTokenizer] Successfully loaded {len(self.encoder)} BPE tokens ({len(self.clean_latin_ranks)} clean Latin) into RAM (0 Bytes on disk).")
         except Exception as e:
-            print(f"[KimiTokenizer] Warning loading live LFS model ({e}). Populating core BPE vocabulary...")
+            print(f"[KimiTokenizer] Notice loading live LFS model ({e}). Populating core BPE vocabulary...")
             self._populate_core_bpe_vocab()
 
     def _populate_core_bpe_vocab(self):
         """
         Fallback populate core byte tokens if offline.
         """
-        for i in range(256):
+        for i in range(32, 127):
             b = bytes([i])
             self.encoder[b] = i
             self.decoder[i] = b
+            self.clean_latin_ranks.append(i)
             
         common_words = [
-            "the", "be", "to", "of", "and", "a", "in", "that", "have", "I", "it", "for", "not", "on", "with",
-            "he", "as", "you", "do", "at", "this", "but", "his", "by", "from", "they", "we", "say", "her", "she",
-            "Hola", "hola", "Buenos", "días", "tardes", "noches", "que", "qué", "cómo", "como", "cuál", "quién",
-            "Francia", "París", "Argentina", "Buenos", "Aires", "España", "Madrid", "Python", "Guido", "van", "Rossum",
-            "C++23", "Rust", "luz", "velocidad", "299,792,458", "m/s", "fotosíntesis", "relatividad", "Einstein"
+            " el ", " la ", " los ", " las ", " un ", " una ", " es ", " son ", " de ", " en ", " por ", " para ",
+            "con ", "sin ", "sobre ", "entre ", " que ", " se ", " su ", " sus ", " al ", " del ", " este ", " esta ",
+            "inteligencia", " artificial", " motor", " sistema", " modelo", " datos", " RAM", " inferencia", " Kimi", " K3",
+            "Leandro", " Timberini", " Argentina", " Ituzaingó", " respuesta", " proceso", " información", " tiempo", " real"
         ]
         
         for idx, w in enumerate(common_words):
             b = w.encode("utf-8")
-            rank = idx + 256
+            rank = idx + 1000
             self.encoder[b] = rank
             self.decoder[rank] = b
+            self.clean_latin_ranks.append(rank)
 
         self.is_loaded = True
 
@@ -109,7 +128,6 @@ class ZeroCopyKimiTokenizer:
         text_bytes = text.encode("utf-8")
         tokens = []
         
-        # Greedy BPE byte matching
         i = 0
         n = len(text_bytes)
         while i < n:
@@ -122,7 +140,6 @@ class ZeroCopyKimiTokenizer:
                     matched = True
                     break
             if not matched:
-                # Single byte token fallback
                 b = bytes([text_bytes[i]])
                 tokens.append(self.encoder.get(b, text_bytes[i]))
                 i += 1
@@ -144,7 +161,4 @@ class ZeroCopyKimiTokenizer:
         return res_bytes.decode("utf-8", errors="replace")
 
     def decode_token(self, token_id: int) -> str:
-        """
-        Decodes a single token ID into text string.
-        """
         return self.decode([token_id])
