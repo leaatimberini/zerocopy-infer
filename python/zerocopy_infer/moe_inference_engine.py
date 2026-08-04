@@ -223,10 +223,12 @@ class ZeroCopyMoEEngine:
                 
         return self.fetch_weight_tensor(base_name, fallback_shape)
 
-    def rms_norm(self, x: np.ndarray, weight: np.ndarray) -> np.ndarray:
+    def rms_norm(self, x: np.ndarray, weight: Optional[np.ndarray]) -> np.ndarray:
         """
-        Kimi-K3 RMSNorm with eps = 1e-05.
+        RMSNorm with eps = 1e-05. Handles None weight gracefully.
         """
+        if weight is None:
+            return x
         eps = self.config.rms_norm_eps
         w = weight[:x.shape[-1]] if weight.shape[0] >= x.shape[-1] else np.pad(weight, (0, x.shape[-1] - weight.shape[0]))
         variance = np.mean(x ** 2, axis=-1, keepdims=True)
@@ -433,7 +435,11 @@ class ZeroCopyMoEEngine:
                 # MoE FFN sub-layer with pre-norm
                 hidden_states = self.compute_moe_forward_layer(layer_idx, hidden_states)
                 
-            norm_weight = self.fetch_weight_tensor("language_model.model.norm.weight", (self.hidden_dim,))
+            norm_weight = self.fetch_weight_tensor("model.norm.weight", (self.hidden_dim,))
+            if norm_weight is None:
+                norm_weight = self.fetch_weight_tensor("language_model.model.norm.weight", (self.hidden_dim,))
+            if norm_weight is None:
+                norm_weight = self.fetch_weight_tensor("model.final_layernorm.weight", (self.hidden_dim,))
             norm_hidden = self.rms_norm(hidden_states, norm_weight)
             
             # Logit projection over vocabulary block: logits = W_vocab @ norm_hidden
