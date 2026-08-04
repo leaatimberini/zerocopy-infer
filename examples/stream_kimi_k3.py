@@ -31,6 +31,7 @@ def main():
     parser.add_argument("--layers", type=int, default=4, help="Number of transformer layers to execute (default: 4, max: 93)")
     parser.add_argument("--tokens", type=int, default=10, help="Number of tokens to generate")
     parser.add_argument("--cache-gb", type=float, default=4.0, help="RAM cache size in GB (default: 4.0)")
+    parser.add_argument("--shards", type=int, default=6, help="Number of initial model shards to index (default: 6)")
     args = parser.parse_args()
     
     print("================================================================================")
@@ -41,12 +42,10 @@ def main():
     prompt = args.prompt
     repo_id = "moonshotai/Kimi-K3"
     
-    shard_filenames = [
-        "model-00001-of-000096.safetensors",
-        "model-00042-of-000096.safetensors",
-        "model-00094-of-000096.safetensors",
-        "model-00096-of-000096.safetensors",
-    ]
+    # Dynamically build shard list: Shards 1..N plus final shard 96
+    shard_filenames = [f"model-{i:05d}-of-000096.safetensors" for i in range(1, min(96, args.shards + 1))]
+    if "model-00096-of-000096.safetensors" not in shard_filenames:
+        shard_filenames.append("model-00096-of-000096.safetensors")
     
     streamer = SafetensorsRangeStreamer(repo_id=repo_id, shards=shard_filenames)
     
