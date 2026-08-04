@@ -1,9 +1,10 @@
 """
-ZeroCopy-Infer: Official Kimi-K3 Real Safetensors MoE & KDA Engine
-===================================================================
+ZeroCopy-Infer: Official Kimi-K3 Real Safetensors MoE, KDA & XTML Engine
+=========================================================================
 Authored by Leandro Emanuel Timberini (Investigador Independiente — Ituzaingó, Buenos Aires, Argentina).
 
-Implements exact official parameters from Moonshot AI's Kimi-K3 config.json:
+Implements exact official parameters from Moonshot AI's Kimi-K3 config.json & encoding_k3.py:
+- XTML Prompt Formatting (<|open|>message role="user"<|sep|>...<|open|>response<|sep|>)
 - 93 Layers (69 KDA Delta Attention Layers + 24 Full MLA Attention Layers)
 - 7168 Hidden Size, 33792 Intermediate Size, 96 Heads, 163840 Vocab
 - 896 Routed Experts (Top-16 per token) + 2 Shared Experts
@@ -80,14 +81,12 @@ class KimiK3Config:
         self.mla_use_nope = mla_use_nope
         self.mla_use_output_gate = mla_use_output_gate
         
-        # 69 KDA Delta Attention Layers
         self.kda_layers = kda_layers if kda_layers is not None else [
             1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15, 17, 18, 19, 21, 22, 23, 25, 26, 27, 29, 30, 31,
             33, 34, 35, 37, 38, 39, 41, 42, 43, 45, 46, 47, 49, 50, 51, 53, 54, 55, 57, 58, 59, 61,
             62, 63, 65, 66, 67, 69, 70, 71, 73, 74, 75, 77, 78, 79, 81, 82, 83, 85, 86, 87, 89, 90, 91
         ]
         
-        # 24 Full MLA Attention Layers
         self.full_attn_layers = full_attn_layers if full_attn_layers is not None else [
             4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80, 84, 88, 92, 93
         ]
@@ -286,11 +285,13 @@ class ZeroCopyMoEEngine:
         self, user_prompt: str, num_tokens: int = 12
     ) -> Generator[Tuple[int, int, str, float, int], None, None]:
         """
-        Executes Official Kimi-K3 Real Safetensors Forward-Pass Stream.
+        Executes Official Kimi-K3 Real Safetensors Forward-Pass Stream with XTML Prompt Formatting.
         """
         self.chat_history.append({"role": "user", "content": user_prompt})
         
-        input_token_ids = self.tokenizer.encode(user_prompt)
+        # Format user prompt with official Kimi-K3 XTML tags (encoding_k3.py)
+        xtml_prompt = self.tokenizer.render_xtml_chat_prompt(user_prompt, thinking=False)
+        input_token_ids = self.tokenizer.encode(xtml_prompt)
         if not input_token_ids:
             input_token_ids = [self.config.bos_token_id, 1000]
             

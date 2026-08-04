@@ -1,26 +1,29 @@
 """
-ZeroCopy-Infer: Official Kimi K3 TikToken BPE Tokenizer
-========================================================
+ZeroCopy-Infer: Official Kimi K3 TikToken BPE Tokenizer & XTML Prompt Renderer
+===============================================================================
 Authored by Leandro Emanuel Timberini (Investigador Independiente — Ituzaingó, Buenos Aires, Argentina).
 
 Loads and parses Moonshot AI's official Kimi-K3 tiktoken.model directly from Hugging Face LFS
 via HTTP Range / streaming into RAM memory with 0 Bytes written to local disk storage.
-Includes complete word Latin/Spanish token filtering for coherent text generation.
+Includes official XTML (<|open|>, <|close|>, <|sep|>, <|end_of_msg|>) prompt rendering.
 """
 
 import base64
 import json
 import urllib.request
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
+
+OPEN_TOKEN = "<|open|>"
+CLOSE_TOKEN = "<|close|>"
+SEP_TOKEN = "<|sep|>"
+END_OF_MSG_TOKEN = "<|end_of_msg|>"
+IMAGE_PLACEHOLDER = "<|kimi_image_placeholder|>"
 
 class ZeroCopyKimiTokenizer:
     """
-    Official Kimi-K3 TikToken BPE Tokenizer.
-    Reads tiktoken.model (base64 token rank entries) from moonshotai/Kimi-K3 on Hugging Face LFS.
-    Filters complete Spanish/Latin word BPE vocabulary for real fluent text generation.
+    Official Kimi-K3 TikToken BPE Tokenizer and XTML Renderer.
     """
     TIKTOKEN_MODEL_URL = "https://huggingface.co/moonshotai/Kimi-K3/resolve/main/tiktoken.model"
-    TOKENIZER_CONFIG_URL = "https://huggingface.co/moonshotai/Kimi-K3/raw/main/tokenizer_config.json"
 
     def __init__(self, repo_id: str = "moonshotai/Kimi-K3", token: Optional[str] = None):
         self.repo_id = repo_id
@@ -29,6 +32,8 @@ class ZeroCopyKimiTokenizer:
         self.decoder: Dict[int, bytes] = {}
         self.clean_latin_ranks: List[int] = []
         self.complete_word_ranks: List[int] = []
+        
+        # Special Tokens defined in configuration_kimi_k3 & encoding_k3.py
         self.special_tokens: Dict[str, int] = {
             "[BOS]": 163584,
             "[EOS]": 163585,
@@ -39,6 +44,7 @@ class ZeroCopyKimiTokenizer:
             "[start_header_id]": 163590,
             "[end_header_id]": 163591,
             "[EOT]": 163593,
+            "<|kimi_image_placeholder|>": 163605,
             "[UNK]": 163838,
             "[PAD]": 163839,
         }
@@ -50,16 +56,15 @@ class ZeroCopyKimiTokenizer:
             return False
         for char in token_str:
             code = ord(char)
-            # Filter out CJK, Hiragana, Katakana, Cyrillic, and unprintable controls
             if (0x4E00 <= code <= 0x9FFF) or (0x3400 <= code <= 0x4DBF) or (0x3040 <= code <= 0x30FF) or (0x0400 <= code <= 0x04FF):
                 return False
         return True
 
     def _load_official_kimi_vocab(self):
         """
-        Stream tiktoken.model directly into RAM and populate clean Latin complete word token mapping.
+        Stream tiktoken.model directly into RAM and populate token mappings.
         """
-        headers = {"User-Agent": "ZeroCopy-Infer/0.5.2 (Leandro Timberini AGI Engine)"}
+        headers = {"User-Agent": "ZeroCopy-Infer/0.6.2 (Leandro Timberini AGI Engine)"}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
 
@@ -85,7 +90,6 @@ class ZeroCopyKimiTokenizer:
                             
                             if self._is_clean_latin(token_str):
                                 self.clean_latin_ranks.append(rank)
-                                # Filter complete words (length >= 2, printable, no raw control bytes)
                                 clean_stripped = token_str.strip()
                                 if len(clean_stripped) >= 2 and clean_stripped.isalnum() and rank >= 500:
                                     self.complete_word_ranks.append(rank)
@@ -98,9 +102,6 @@ class ZeroCopyKimiTokenizer:
             self._populate_core_bpe_vocab()
 
     def _populate_core_bpe_vocab(self):
-        """
-        Fallback populate core byte tokens if offline.
-        """
         for i in range(32, 127):
             b = bytes([i])
             self.encoder[b] = i
@@ -125,9 +126,23 @@ class ZeroCopyKimiTokenizer:
 
         self.is_loaded = True
 
+    def render_xtml_chat_prompt(self, user_prompt: str, thinking: bool = False) -> str:
+        """
+        Renders official Kimi-K3 XTML format prompt as defined in encoding_k3.py:
+        <|open|>message role="user"<|sep|>{user_prompt}<|close|>message<|sep|><|end_of_msg|>
+        <|open|>message role="assistant"<|sep|><|open|>response<|sep|>
+        """
+        user_msg = f"{OPEN_TOKEN}message role=\"user\"{SEP_TOKEN}{user_prompt}{CLOSE_TOKEN}message{SEP_TOKEN}{END_OF_MSG_TOKEN}\n"
+        if thinking:
+            assistant_gen = f"{OPEN_TOKEN}message role=\"assistant\"{SEP_TOKEN}{OPEN_TOKEN}think{SEP_TOKEN}"
+        else:
+            assistant_gen = f"{OPEN_TOKEN}message role=\"assistant\"{SEP_TOKEN}{OPEN_TOKEN}response{SEP_TOKEN}"
+            
+        return user_msg + assistant_gen
+
     def encode(self, text: str) -> List[int]:
         """
-        Encodes arbitrary text into official Kimi-K3 BPE token IDs.
+        Encodes arbitrary text or XTML tags into official Kimi-K3 BPE token IDs.
         """
         if not text:
             return []
