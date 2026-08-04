@@ -18,7 +18,7 @@ import gc
 import time
 import json
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Generator
+from typing import Dict, List, Optional, Tuple, Generator, Any
 from collections import OrderedDict
 from .hf_range_stream import SafetensorsRangeStreamer
 from .tokenizer import ZeroCopyKimiTokenizer
