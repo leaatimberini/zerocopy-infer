@@ -145,46 +145,49 @@ class ZeroCopyMoEEngine:
         self.total_range_requests = 0
         self.total_bytes_streamed = 0
 
-    def fetch_weight_tensor(self, tensor_name: str, fallback_shape: Tuple[int, ...]) -> np.ndarray:
+    def fetch_weight_tensor(self, tensor_name: str, fallback_shape: Tuple[int, ...]) -> Optional[np.ndarray]:
         """
         Stream exact weight slice over HTTP Range Request directly into RAM.
+        Returns None if tensor is not present in indexed shards (enabling fast skip).
         """
         if tensor_name in self.tensor_lru_cache:
             self.tensor_lru_cache.move_to_end(tensor_name)
             return self.tensor_lru_cache[tensor_name]
         
-        fetched = False
-        arr = None
-        
-        if tensor_name in self.streamer.tensor_map:
-            try:
-                arr = self.streamer.fetch_tensor(tensor_name)
-                meta = self.streamer.tensor_map[tensor_name]
-                self.total_bytes_streamed += meta["length"]
-                fetched = True
-            except Exception:
-                fetched = False
-                
-        if not fetched or arr is None:
-            # Use zeros instead of random noise — layers with missing weights become no-ops
-            # via residual connections, rather than injecting garbage
-            arr = np.zeros(fallback_shape, dtype=np.float32)
-            self.total_bytes_streamed += arr.nbytes
-            
-        self.total_range_requests += 1
-        
-        arr_bytes = arr.nbytes
-        while self.current_cache_bytes + arr_bytes > self.max_cache_bytes and self.tensor_lru_cache:
-            k, evicted_arr = self.tensor_lru_cache.popitem(last=False)
-            self.current_cache_bytes -= evicted_arr.nbytes
-            del evicted_arr
-            gc.collect()
-            
-        self.tensor_lru_cache[tensor_name] = arr
-        self.current_cache_bytes += arr_bytes
-        return arr
+        target_key = tensor_name
+        if target_key not in self.streamer.tensor_map:
+            alt_key = f"language_model.{tensor_name}"
+            if alt_key in self.streamer.tensor_map:
+                target_key = alt_key
+            else:
+                alt_key2 = f"language_model.model.{tensor_name.replace('model.', '')}"
+                if alt_key2 in self.streamer.tensor_map:
+                    target_key = alt_key2
+                else:
+                    # Tensor is not in any indexed shard — return None so compute loop can skip
+                    return None
 
-    def fetch_mxfp4_weight_tensor(self, base_name: str, fallback_shape: Tuple[int, ...]) -> np.ndarray:
+        try:
+            arr = self.streamer.fetch_tensor(target_key)
+            meta = self.streamer.tensor_map[target_key]
+            self.total_bytes_streamed += meta["length"]
+            self.total_range_requests += 1
+            
+            arr_bytes = arr.nbytes
+            while self.current_cache_bytes + arr_bytes > self.max_cache_bytes and self.tensor_lru_cache:
+                k, evicted_arr = self.tensor_lru_cache.popitem(last=False)
+                self.current_cache_bytes -= evicted_arr.nbytes
+                del evicted_arr
+                gc.collect()
+                
+            self.tensor_lru_cache[tensor_name] = arr
+            self.current_cache_bytes += arr_bytes
+            return arr
+        except Exception as e:
+            print(f"[ZeroCopy-Infer] Notice fetching '{tensor_name}': {e}")
+            return None
+
+    def fetch_mxfp4_weight_tensor(self, base_name: str, fallback_shape: Tuple[int, ...]) -> Optional[np.ndarray]:
         """
         Stream and dequantize MXFP4 micro-quantized weights (.weight_packed + .weight_scale) directly from HF.
         """
@@ -195,7 +198,8 @@ class ZeroCopyMoEEngine:
             try:
                 packed = self.fetch_weight_tensor(packed_name, (fallback_shape[0], fallback_shape[1] // 2))
                 scale = self.fetch_weight_tensor(scale_name, (fallback_shape[0], fallback_shape[1] // 32))
-                return dequantize_mxfp4(packed.astype(np.uint8), scale.astype(np.uint8))
+                if packed is not None and scale is not None:
+                    return dequantize_mxfp4(packed.astype(np.uint8), scale.astype(np.uint8))
             except Exception:
                 pass
                 
@@ -231,7 +235,7 @@ class ZeroCopyMoEEngine:
         # Pre-attention RMSNorm (input_layernorm)
         norm_name = f"model.layers.{layer_idx}.input_layernorm.weight"
         norm_w = self.fetch_weight_tensor(norm_name, (self.hidden_dim,))
-        normed = self.rms_norm(hidden_states, norm_w)
+        normed = self.rms_norm(hidden_states, norm_w) if norm_w is not None else hidden_states
         
         kv_dim = self.config.kv_lora_rank  # 512
         
@@ -242,6 +246,9 @@ class ZeroCopyMoEEngine:
         W_Q = self.fetch_weight_tensor(q_name, (kv_dim, self.hidden_dim))
         W_K = self.fetch_weight_tensor(k_name, (kv_dim, self.hidden_dim))
         W_V = self.fetch_weight_tensor(v_name, (kv_dim, self.hidden_dim))
+        
+        if W_Q is None or W_K is None or W_V is None:
+            return hidden_states  # Skip layer if QKV projections are not in indexed shards
         
         Q = np.matmul(W_Q, normed)
         K = np.matmul(W_K, normed)
@@ -254,6 +261,9 @@ class ZeroCopyMoEEngine:
         out_name = f"model.layers.{layer_idx}.self_attn.o_proj.weight"
         W_O = self.fetch_weight_tensor(out_name, (self.hidden_dim, kv_dim))
         
+        if W_O is None:
+            return hidden_states
+            
         return hidden_states + np.matmul(W_O, kda_out)
 
     def compute_moe_forward_layer(self, layer_idx: int, hidden_states: np.ndarray) -> np.ndarray:
@@ -264,10 +274,13 @@ class ZeroCopyMoEEngine:
         # Post-attention RMSNorm (post_attention_layernorm)
         norm_name = f"model.layers.{layer_idx}.post_attention_layernorm.weight"
         norm_w = self.fetch_weight_tensor(norm_name, (self.hidden_dim,))
-        normed = self.rms_norm(hidden_states, norm_w)
+        normed = self.rms_norm(hidden_states, norm_w) if norm_w is not None else hidden_states
         
         gate_tensor_name = f"model.layers.{layer_idx}.block_sparse_moe.gate.weight"
         W_gate = self.fetch_weight_tensor(gate_tensor_name, (self.config.num_experts, self.hidden_dim))
+        
+        if W_gate is None:
+            return hidden_states  # Skip MoE if gate router is not in indexed shards
         
         # Router Logits with Sigmoid Router Activation (config.json)
         router_logits = np.matmul(W_gate, normed)
@@ -289,7 +302,7 @@ class ZeroCopyMoEEngine:
         
         moe_output = np.zeros_like(hidden_states)
         
-        # Stream Top-16 Expert Weights
+        # Stream Top-16 Expert Weights (fast skip if missing)
         for idx_pos, expert_idx in enumerate(top_k_indices):
             weight_val = top_k_weights[idx_pos]
             
@@ -300,6 +313,9 @@ class ZeroCopyMoEEngine:
             W1 = self.fetch_mxfp4_weight_tensor(w1_base, (self.moe_inter, self.hidden_dim))
             W2 = self.fetch_mxfp4_weight_tensor(w2_base, (self.hidden_dim, self.moe_inter))
             W3 = self.fetch_mxfp4_weight_tensor(w3_base, (self.moe_inter, self.hidden_dim))
+            
+            if W1 is None or W2 is None or W3 is None:
+                continue  # Skip expert if its weights are not in indexed shards
             
             gate_proj = self.silu(np.matmul(W1, normed))
             up_proj = np.matmul(W3, normed)
@@ -314,8 +330,9 @@ class ZeroCopyMoEEngine:
             
             SW1 = self.fetch_weight_tensor(sw1_name, (self.moe_inter, self.hidden_dim))
             SW2 = self.fetch_weight_tensor(sw2_name, (self.hidden_dim, self.moe_inter))
-            shared_out = np.matmul(SW2, self.silu(np.matmul(SW1, normed)))
-            moe_output += shared_out
+            if SW1 is not None and SW2 is not None:
+                shared_out = np.matmul(SW2, self.silu(np.matmul(SW1, normed)))
+                moe_output += shared_out
 
         return hidden_states + moe_output
 
