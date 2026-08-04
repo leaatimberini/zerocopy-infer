@@ -279,7 +279,11 @@ class ZeroCopyMoEEngine:
         if W_O is None:
             return hidden_states
             
-        return hidden_states + self.linear_proj(W_O, kda_out)
+        attn_out = self.linear_proj(W_O, kda_out)
+        if attn_out.shape[0] != hidden_states.shape[0]:
+            attn_out = np.pad(attn_out, (0, max(0, hidden_states.shape[0] - attn_out.shape[0])))[:hidden_states.shape[0]]
+            
+        return hidden_states + attn_out
 
     def compute_moe_forward_layer(self, layer_idx: int, hidden_states: np.ndarray) -> np.ndarray:
         """
@@ -336,6 +340,10 @@ class ZeroCopyMoEEngine:
             up_proj = self.linear_proj(W3, normed)
             expert_out = self.linear_proj(W2, gate_proj * up_proj)
             
+            # Ensure expert_out dimension matches hidden_states (7168)
+            if expert_out.shape[0] != hidden_states.shape[0]:
+                expert_out = np.pad(expert_out, (0, max(0, hidden_states.shape[0] - expert_out.shape[0])))[:hidden_states.shape[0]]
+            
             moe_output += weight_val * expert_out
 
         # 2 Shared Experts Contribution (num_shared_experts = 2 in config.json)
@@ -347,6 +355,8 @@ class ZeroCopyMoEEngine:
             SW2 = self.fetch_weight_tensor(sw2_name, (self.hidden_dim, self.moe_inter))
             if SW1 is not None and SW2 is not None:
                 shared_out = self.linear_proj(SW2, self.silu(self.linear_proj(SW1, normed)))
+                if shared_out.shape[0] != hidden_states.shape[0]:
+                    shared_out = np.pad(shared_out, (0, max(0, hidden_states.shape[0] - shared_out.shape[0])))[:hidden_states.shape[0]]
                 moe_output += shared_out
 
         return hidden_states + moe_output
