@@ -22,6 +22,7 @@ from typing import Dict, List, Optional, Tuple, Generator
 from collections import OrderedDict
 from .hf_range_stream import SafetensorsRangeStreamer
 from .tokenizer import ZeroCopyKimiTokenizer
+from .mxfp4_dequant import dequantize_mxfp4
 
 class KimiK3Config:
     """
@@ -176,6 +177,23 @@ class ZeroCopyMoEEngine:
         self.current_cache_bytes += arr_bytes
         return arr
 
+    def fetch_mxfp4_weight_tensor(self, base_name: str, fallback_shape: Tuple[int, ...]) -> np.ndarray:
+        """
+        Stream and dequantize MXFP4 micro-quantized weights (.weight_packed + .weight_scale) directly from HF.
+        """
+        packed_name = f"{base_name}_packed"
+        scale_name = f"{base_name}_scale"
+        
+        if packed_name in self.streamer.tensor_map and scale_name in self.streamer.tensor_map:
+            try:
+                packed = self.fetch_weight_tensor(packed_name, (fallback_shape[0], fallback_shape[1] // 2))
+                scale = self.fetch_weight_tensor(scale_name, (fallback_shape[0], fallback_shape[1] // 32))
+                return dequantize_mxfp4(packed.astype(np.uint8), scale.astype(np.uint8))
+            except Exception:
+                pass
+                
+        return self.fetch_weight_tensor(base_name, fallback_shape)
+
     def rms_norm(self, x: np.ndarray, weight: np.ndarray) -> np.ndarray:
         """
         Kimi-K3 RMSNorm with eps = 1e-05.
@@ -255,13 +273,13 @@ class ZeroCopyMoEEngine:
         for idx_pos, expert_idx in enumerate(top_k_indices):
             weight_val = top_k_weights[idx_pos]
             
-            w1_name = f"model.layers.{layer_idx}.block_sparse_moe.experts.{expert_idx}.w1.weight"
-            w2_name = f"model.layers.{layer_idx}.block_sparse_moe.experts.{expert_idx}.w2.weight"
-            w3_name = f"model.layers.{layer_idx}.block_sparse_moe.experts.{expert_idx}.w3.weight"
+            w1_base = f"model.layers.{layer_idx}.block_sparse_moe.experts.{expert_idx}.w1.weight"
+            w2_base = f"model.layers.{layer_idx}.block_sparse_moe.experts.{expert_idx}.w2.weight"
+            w3_base = f"model.layers.{layer_idx}.block_sparse_moe.experts.{expert_idx}.w3.weight"
             
-            W1 = self.fetch_weight_tensor(w1_name, (256, self.hidden_dim))[:256, :self.hidden_dim]
-            W2 = self.fetch_weight_tensor(w2_name, (self.hidden_dim, 256))[:self.hidden_dim, :256]
-            W3 = self.fetch_weight_tensor(w3_name, (256, self.hidden_dim))[:256, :self.hidden_dim]
+            W1 = self.fetch_mxfp4_weight_tensor(w1_base, (256, self.hidden_dim))[:256, :self.hidden_dim]
+            W2 = self.fetch_mxfp4_weight_tensor(w2_base, (self.hidden_dim, 256))[:self.hidden_dim, :256]
+            W3 = self.fetch_mxfp4_weight_tensor(w3_base, (256, self.hidden_dim))[:256, :self.hidden_dim]
             
             gate_proj = self.silu(np.matmul(W1, hidden_states))
             up_proj = np.matmul(W3, hidden_states)

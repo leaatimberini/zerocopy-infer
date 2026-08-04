@@ -11,8 +11,9 @@ from .moe_inference_engine import ZeroCopyMoEEngine, KimiK3Config
 from .media_utils import navit_resize_image, navit_patchify, normalize_image
 from .modeling_kimi_k3 import KimiK3ForConditionalGeneration, PatchMergerMLPV2
 from .modeling_kimi_linear import SituAndMul, KimiMoEGate, ShortConvolution1D
+from .mxfp4_dequant import dequantize_mxfp4
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 __author__ = "Leandro Emanuel Timberini"
 __all__ = [
     "SafetensorsRangeStreamer",
@@ -26,6 +27,7 @@ __all__ = [
     "SituAndMul",
     "KimiMoEGate",
     "ShortConvolution1D",
+    "dequantize_mxfp4",
     "navit_resize_image",
     "navit_patchify",
     "normalize_image",
