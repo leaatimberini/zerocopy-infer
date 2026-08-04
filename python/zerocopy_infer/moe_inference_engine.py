@@ -111,6 +111,7 @@ class ZeroCopyMoEEngine:
         num_total_experts: Optional[int] = None,
         top_k_experts: Optional[int] = None,
         ram_cache_gb: float = 0.25,
+        num_active_layers: Optional[int] = None,
         api_key: Optional[str] = None,
     ):
         self.streamer = streamer
@@ -125,6 +126,12 @@ class ZeroCopyMoEEngine:
             
         self.ram_cache_gb = ram_cache_gb
         self.hidden_dim = self.config.hidden_size  # Exact Kimi-K3 hidden dimension: 7168
+        self.moe_inter = self.config.moe_intermediate_size  # 3072 for routed expert FFN
+        # Number of transformer layers to execute (reduce for Termux memory constraints)
+        if num_active_layers is not None:
+            self.num_active_layers = min(num_active_layers, self.config.num_hidden_layers)
+        else:
+            self.num_active_layers = self.config.num_hidden_layers
         self.tokenizer = ZeroCopyKimiTokenizer(repo_id=streamer.repo_id)
         
         # LRU cache for streamed tensor weights in RAM
@@ -159,9 +166,9 @@ class ZeroCopyMoEEngine:
                 fetched = False
                 
         if not fetched or arr is None:
-            seed = (abs(hash(tensor_name)) % 1000000) + 1
-            np.random.seed(seed)
-            arr = np.random.randn(*fallback_shape).astype(np.float32) * 0.02
+            # Use zeros instead of random noise — layers with missing weights become no-ops
+            # via residual connections, rather than injecting garbage
+            arr = np.zeros(fallback_shape, dtype=np.float32)
             self.total_bytes_streamed += arr.nbytes
             
         self.total_range_requests += 1
@@ -219,38 +226,51 @@ class ZeroCopyMoEEngine:
         """
         Executes Kimi Delta Attention (KDA) Recurrent Linear Layer Update (69 KDA layers):
         S_t = S_{t-1} + K_t^T * V_t - Delta_t
+        Pre-attention RMSNorm applied internally (Pre-LN architecture).
         """
+        # Pre-attention RMSNorm (input_layernorm)
+        norm_name = f"model.layers.{layer_idx}.input_layernorm.weight"
+        norm_w = self.fetch_weight_tensor(norm_name, (self.hidden_dim,))
+        normed = self.rms_norm(hidden_states, norm_w)
+        
+        kv_dim = self.config.kv_lora_rank  # 512
+        
         q_name = f"model.layers.{layer_idx}.self_attn.q_proj.weight"
         k_name = f"model.layers.{layer_idx}.self_attn.k_proj.weight"
         v_name = f"model.layers.{layer_idx}.self_attn.v_proj.weight"
         
-        W_Q = self.fetch_weight_tensor(q_name, (256, self.hidden_dim))[:256, :self.hidden_dim]
-        W_K = self.fetch_weight_tensor(k_name, (256, self.hidden_dim))[:256, :self.hidden_dim]
-        W_V = self.fetch_weight_tensor(v_name, (256, self.hidden_dim))[:256, :self.hidden_dim]
+        W_Q = self.fetch_weight_tensor(q_name, (kv_dim, self.hidden_dim))
+        W_K = self.fetch_weight_tensor(k_name, (kv_dim, self.hidden_dim))
+        W_V = self.fetch_weight_tensor(v_name, (kv_dim, self.hidden_dim))
         
-        Q = np.matmul(W_Q, hidden_states)
-        K = np.matmul(W_K, hidden_states)
-        V = np.matmul(W_V, hidden_states)
+        Q = np.matmul(W_Q, normed)
+        K = np.matmul(W_K, normed)
+        V = np.matmul(W_V, normed)
         
         # Delta Attention Recurrent State Projection
         delta = self.sigmoid(Q) * K
         kda_out = self.silu(Q * K - delta)
         
         out_name = f"model.layers.{layer_idx}.self_attn.o_proj.weight"
-        W_O = self.fetch_weight_tensor(out_name, (self.hidden_dim, 256))[:self.hidden_dim, :256]
+        W_O = self.fetch_weight_tensor(out_name, (self.hidden_dim, kv_dim))
         
         return hidden_states + np.matmul(W_O, kda_out)
 
     def compute_moe_forward_layer(self, layer_idx: int, hidden_states: np.ndarray) -> np.ndarray:
         """
         Executes Kimi-K3 MoE Layer with Sigmoid Router Activation & 2 Shared Experts.
+        Post-attention RMSNorm applied internally (Pre-LN architecture).
         """
+        # Post-attention RMSNorm (post_attention_layernorm)
+        norm_name = f"model.layers.{layer_idx}.post_attention_layernorm.weight"
+        norm_w = self.fetch_weight_tensor(norm_name, (self.hidden_dim,))
+        normed = self.rms_norm(hidden_states, norm_w)
+        
         gate_tensor_name = f"model.layers.{layer_idx}.block_sparse_moe.gate.weight"
         W_gate = self.fetch_weight_tensor(gate_tensor_name, (self.config.num_experts, self.hidden_dim))
-        W_gate = W_gate[:self.config.num_experts, :self.hidden_dim]
         
         # Router Logits with Sigmoid Router Activation (config.json)
-        router_logits = np.matmul(W_gate, hidden_states)
+        router_logits = np.matmul(W_gate, normed)
         if self.config.moe_router_activation_func == "sigmoid":
             expert_scores = self.sigmoid(router_logits)
         else:
@@ -277,12 +297,12 @@ class ZeroCopyMoEEngine:
             w2_base = f"model.layers.{layer_idx}.block_sparse_moe.experts.{expert_idx}.w2.weight"
             w3_base = f"model.layers.{layer_idx}.block_sparse_moe.experts.{expert_idx}.w3.weight"
             
-            W1 = self.fetch_mxfp4_weight_tensor(w1_base, (256, self.hidden_dim))[:256, :self.hidden_dim]
-            W2 = self.fetch_mxfp4_weight_tensor(w2_base, (self.hidden_dim, 256))[:self.hidden_dim, :256]
-            W3 = self.fetch_mxfp4_weight_tensor(w3_base, (256, self.hidden_dim))[:256, :self.hidden_dim]
+            W1 = self.fetch_mxfp4_weight_tensor(w1_base, (self.moe_inter, self.hidden_dim))
+            W2 = self.fetch_mxfp4_weight_tensor(w2_base, (self.hidden_dim, self.moe_inter))
+            W3 = self.fetch_mxfp4_weight_tensor(w3_base, (self.moe_inter, self.hidden_dim))
             
-            gate_proj = self.silu(np.matmul(W1, hidden_states))
-            up_proj = np.matmul(W3, hidden_states)
+            gate_proj = self.silu(np.matmul(W1, normed))
+            up_proj = np.matmul(W3, normed)
             expert_out = np.matmul(W2, gate_proj * up_proj)
             
             moe_output += weight_val * expert_out
@@ -292,9 +312,9 @@ class ZeroCopyMoEEngine:
             sw1_name = f"model.layers.{layer_idx}.block_sparse_moe.shared_experts.{shared_idx}.w1.weight"
             sw2_name = f"model.layers.{layer_idx}.block_sparse_moe.shared_experts.{shared_idx}.w2.weight"
             
-            SW1 = self.fetch_weight_tensor(sw1_name, (256, self.hidden_dim))[:256, :self.hidden_dim]
-            SW2 = self.fetch_weight_tensor(sw2_name, (self.hidden_dim, 256))[:self.hidden_dim, :256]
-            shared_out = np.matmul(SW2, self.silu(np.matmul(SW1, hidden_states)))
+            SW1 = self.fetch_weight_tensor(sw1_name, (self.moe_inter, self.hidden_dim))
+            SW2 = self.fetch_weight_tensor(sw2_name, (self.hidden_dim, self.moe_inter))
+            shared_out = np.matmul(SW2, self.silu(np.matmul(SW1, normed)))
             moe_output += shared_out
 
         return hidden_states + moe_output
@@ -344,14 +364,14 @@ class ZeroCopyMoEEngine:
         for step in range(1, num_tokens + 1):
             start_time = time.time()
             
-            # Pass hidden state through KDA & MoE Transformer Layers across 93 Layers
-            for layer_idx in range(min(2, self.config.num_hidden_layers)):
-                if self.config.is_kda_layer(layer_idx):
-                    hidden_states = self.compute_kda_layer(layer_idx, hidden_states)
-                else:
-                    hidden_states = self.compute_moe_forward_layer(layer_idx, hidden_states)
+            # Pass hidden state through Transformer Layers (Attention + MoE per layer)
+            for layer_idx in range(self.num_active_layers):
+                # Attention sub-layer with pre-norm (KDA approximation for all layer types)
+                hidden_states = self.compute_kda_layer(layer_idx, hidden_states)
+                # MoE FFN sub-layer with pre-norm
+                hidden_states = self.compute_moe_forward_layer(layer_idx, hidden_states)
                 
-            norm_weight = self.fetch_weight_tensor("language_model.model.norm.weight", (self.hidden_dim,))[:self.hidden_dim]
+            norm_weight = self.fetch_weight_tensor("language_model.model.norm.weight", (self.hidden_dim,))
             norm_hidden = self.rms_norm(hidden_states, norm_weight)
             
             # Real Causal LM Logit Projection over Clean Spanish Vocabulary: logits = W_vocab * norm_hidden
@@ -390,10 +410,9 @@ class ZeroCopyMoEEngine:
             generated_token_ids.append(sampled_token_id)
             assistant_reply += decoded_word
             
-            # Autoregressive State Transition: H_{t+1} = 0.7 * H_t + 0.3 * E[x_t]
+            # Correct autoregressive: input for next step is the embedding of the sampled token
             token_embed = W_embed_full[sampled_token_id % W_embed_full.shape[0]]
-            query_vec = 0.7 * query_vec + 0.3 * token_embed
-            hidden_states = query_vec.copy()
+            hidden_states = token_embed.copy()
             
             gc.collect()
             

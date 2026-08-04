@@ -13,6 +13,7 @@ Third-Party Completion APIs Used: 0.
 
 import sys
 import os
+import argparse
 
 if sys.platform == "win32":
     try:
@@ -25,12 +26,19 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 from zerocopy_infer import SafetensorsRangeStreamer, ZeroCopyMoEEngine
 
 def main():
+    parser = argparse.ArgumentParser(description="ZeroCopy-Infer: Pure Safetensors Zero-Disk MoE Streaming Forward-Pass Engine")
+    parser.add_argument("prompt", nargs="?", default="¿Qué es la inteligencia artificial?", help="User prompt")
+    parser.add_argument("--layers", type=int, default=4, help="Number of transformer layers to execute (default: 4, max: 93)")
+    parser.add_argument("--tokens", type=int, default=10, help="Number of tokens to generate")
+    parser.add_argument("--cache-gb", type=float, default=4.0, help="RAM cache size in GB (default: 4.0)")
+    args = parser.parse_args()
+    
     print("================================================================================")
     print(" ZeroCopy-Infer: Pure Safetensors Zero-Disk MoE Streaming Forward-Pass Engine")
     print(" Authored by Leandro Emanuel Timberini (Ituzaingó, Buenos Aires, Argentina)")
     print("================================================================================")
     
-    prompt = sys.argv[1] if len(sys.argv) > 1 else "¿Qué es la inteligencia artificial?"
+    prompt = args.prompt
     repo_id = "moonshotai/Kimi-K3"
     
     shard_filenames = [
@@ -48,25 +56,26 @@ def main():
     except Exception as e:
         print(f"[Info] Remote header parse notice: {e}")
 
-    print("\n[2/3] Step 2: Initializing Pure Safetensors MoE Engine (Kimi-K3 BPE Tokenizer)...")
+    print(f"\n[2/3] Step 2: Initializing MoE Engine ({args.layers} active layers, {args.cache_gb} GB cache)...")
     engine = ZeroCopyMoEEngine(
         streamer=streamer,
         num_layers=93,
         num_total_experts=896,
         top_k_experts=16,
-        ram_cache_gb=8.0,
+        ram_cache_gb=args.cache_gb,
+        num_active_layers=args.layers,
     )
     
-    print("\n[3/3] Step 3: Executing Real Safetensors Forward-Pass Inference...")
+    print(f"\n[3/3] Step 3: Executing Forward-Pass Inference ({args.layers} layers, {args.tokens} tokens)...")
     print(f"User Prompt: '{prompt}'")
     print("--------------------------------------------------------------------------------")
     
     output_text = ""
-    for step, token_id, decoded_word, latency, total_bytes in engine.generate_chat_response_stream(prompt, num_tokens=10):
+    for step, token_id, decoded_word, latency, total_bytes in engine.generate_chat_response_stream(prompt, num_tokens=args.tokens):
         output_text += decoded_word + " "
         mb_streamed = total_bytes / (1024 * 1024)
         clean_word = repr(decoded_word)[1:-1]
-        print(f"Token [{step}/10] -> Word: '{clean_word}' (ID: {token_id}) | Latency: {latency * 1000:.2f} ms | Streamed: {mb_streamed:.2f} MB")
+        print(f"Token [{step}/{args.tokens}] -> Word: '{clean_word}' (ID: {token_id}) | Latency: {latency * 1000:.2f} ms | Streamed: {mb_streamed:.2f} MB")
 
     print("\n================================================================================")
     print(" FINAL SAFETENSORS GENERATED RESPONSE")
