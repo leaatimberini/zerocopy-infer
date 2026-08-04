@@ -6,13 +6,18 @@ Authored by Leandro Emanuel Timberini (Investigador Independiente — Ituzaingó
 
 from .hf_range_stream import SafetensorsRangeStreamer
 from .tokenizer import ZeroCopyKimiTokenizer, ZeroCopyKimiTokenizer as ZeroCopyTokenizer
-from .moe_inference_engine import ZeroCopyMoEEngine
+from .moe_inference_engine import ZeroCopyMoEEngine, KimiK3Config
+from .media_utils import navit_resize_image, navit_patchify, normalize_image
 
-__version__ = "0.1.5"
+__version__ = "0.6.4"
 __author__ = "Leandro Emanuel Timberini"
 __all__ = [
     "SafetensorsRangeStreamer",
     "ZeroCopyKimiTokenizer",
     "ZeroCopyTokenizer",
     "ZeroCopyMoEEngine",
+    "KimiK3Config",
+    "navit_resize_image",
+    "navit_patchify",
+    "normalize_image",
 ]
