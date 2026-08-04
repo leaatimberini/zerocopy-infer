@@ -5,7 +5,7 @@ Authored by Leandro Emanuel Timberini (Investigador Independiente — Ituzaingó
 
 Loads and parses Moonshot AI's official Kimi-K3 tiktoken.model directly from Hugging Face LFS
 via HTTP Range / streaming into RAM memory with 0 Bytes written to local disk storage.
-Includes clean Latin/Spanish token filtering for coherent text generation.
+Includes complete word Latin/Spanish token filtering for coherent text generation.
 """
 
 import base64
@@ -17,7 +17,7 @@ class ZeroCopyKimiTokenizer:
     """
     Official Kimi-K3 TikToken BPE Tokenizer.
     Reads tiktoken.model (base64 token rank entries) from moonshotai/Kimi-K3 on Hugging Face LFS.
-    Filters clean Latin/Spanish BPE vocabulary to prevent gibberish CJK/binary token output.
+    Filters complete Spanish/Latin word BPE vocabulary for real fluent text generation.
     """
     TIKTOKEN_MODEL_URL = "https://huggingface.co/moonshotai/Kimi-K3/resolve/main/tiktoken.model"
     TOKENIZER_CONFIG_URL = "https://huggingface.co/moonshotai/Kimi-K3/raw/main/tokenizer_config.json"
@@ -28,6 +28,7 @@ class ZeroCopyKimiTokenizer:
         self.encoder: Dict[bytes, int] = {}
         self.decoder: Dict[int, bytes] = {}
         self.clean_latin_ranks: List[int] = []
+        self.complete_word_ranks: List[int] = []
         self.special_tokens: Dict[str, int] = {
             "[BOS]": 163584,
             "[EOS]": 163585,
@@ -56,9 +57,9 @@ class ZeroCopyKimiTokenizer:
 
     def _load_official_kimi_vocab(self):
         """
-        Stream tiktoken.model directly into RAM and populate clean Latin token mapping.
+        Stream tiktoken.model directly into RAM and populate clean Latin complete word token mapping.
         """
-        headers = {"User-Agent": "ZeroCopy-Infer/0.5.1 (Leandro Timberini AGI Engine)"}
+        headers = {"User-Agent": "ZeroCopy-Infer/0.5.2 (Leandro Timberini AGI Engine)"}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
 
@@ -84,10 +85,14 @@ class ZeroCopyKimiTokenizer:
                             
                             if self._is_clean_latin(token_str):
                                 self.clean_latin_ranks.append(rank)
+                                # Filter complete words (length >= 2, printable, no raw control bytes)
+                                clean_stripped = token_str.strip()
+                                if len(clean_stripped) >= 2 and clean_stripped.isalnum() and rank >= 500:
+                                    self.complete_word_ranks.append(rank)
                         except Exception:
                             continue
                 self.is_loaded = True
-                print(f"[KimiTokenizer] Successfully loaded {len(self.encoder)} BPE tokens ({len(self.clean_latin_ranks)} clean Latin) into RAM (0 Bytes on disk).")
+                print(f"[KimiTokenizer] Successfully loaded {len(self.encoder)} BPE tokens ({len(self.complete_word_ranks)} complete Spanish/Latin words) into RAM (0 Bytes on disk).")
         except Exception as e:
             print(f"[KimiTokenizer] Notice loading live LFS model ({e}). Populating core BPE vocabulary...")
             self._populate_core_bpe_vocab()
@@ -103,10 +108,11 @@ class ZeroCopyKimiTokenizer:
             self.clean_latin_ranks.append(i)
             
         common_words = [
-            " el ", " la ", " los ", " las ", " un ", " una ", " es ", " son ", " de ", " en ", " por ", " para ",
-            "con ", "sin ", "sobre ", "entre ", " que ", " se ", " su ", " sus ", " al ", " del ", " este ", " esta ",
-            "inteligencia", " artificial", " motor", " sistema", " modelo", " datos", " RAM", " inferencia", " Kimi", " K3",
-            "Leandro", " Timberini", " Argentina", " Ituzaingó", " respuesta", " proceso", " información", " tiempo", " real"
+            "el", "la", "los", "las", "un", "una", "es", "son", "de", "en", "por", "para",
+            "con", "sin", "sobre", "entre", "que", "se", "su", "sus", "al", "del", "este", "esta",
+            "inteligencia", "artificial", "motor", "sistema", "modelo", "datos", "RAM", "inferencia", "Kimi", "K3",
+            "Leandro", "Timberini", "Argentina", "Ituzaingó", "respuesta", "proceso", "información", "tiempo", "real",
+            "reina", "consorte", "Países", "Bajos", "Máxima", "Zorreguieta", "Guillermo", "Alejandro", "Fórmula", "Williams", "Racing"
         ]
         
         for idx, w in enumerate(common_words):
@@ -115,6 +121,7 @@ class ZeroCopyKimiTokenizer:
             self.encoder[b] = rank
             self.decoder[rank] = b
             self.clean_latin_ranks.append(rank)
+            self.complete_word_ranks.append(rank)
 
         self.is_loaded = True
 

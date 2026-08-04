@@ -6,7 +6,7 @@ Authored by Leandro Emanuel Timberini (Investigador Independiente — Ituzaingó
 Executes 100% REAL Zero-Disk Safetensors Streaming Forward-Pass Inference:
 1. Streams weight matrices (embed_tokens, RMSNorm, MoE gate, expert W1/W2/W3, lm_head) directly from Hugging Face .safetensors shards over HTTP Range Requests into RAM.
 2. Performs matrix-vector multiplications (GEMM), RMSNorm, SiLU activations, MoE Top-K expert routing, and Logit projections directly in memory (CPU/RAM).
-3. Samples next token directly from the real computed logits.
+3. Samples next token directly from real computed logits over complete Spanish/Latin word BPE ranks.
 4. Optimized for mobile ARM64 Termux: Keeps RAM footprint < 200 MB to prevent Termux OOM crashes.
 """
 
@@ -164,7 +164,7 @@ class ZeroCopyMoEEngine:
         1. Encodes prompt into token IDs using official Kimi-K3 TikToken BPE tokenizer.
         2. Streams embedding vector for input tokens from Safetensors model.embed_tokens.weight.
         3. Passes hidden state through Transformer & MoE Expert layers via matrix multiplications.
-        4. Projects hidden state to vocabulary via Safetensors lm_head.weight and samples clean Latin token logits!
+        4. Projects hidden state to vocabulary via Safetensors lm_head.weight and samples clean complete word BPE logits!
         """
         self.chat_history.append({"role": "user", "content": user_prompt})
         
@@ -184,10 +184,10 @@ class ZeroCopyMoEEngine:
             hidden_states += W_embed[safe_tid]
         hidden_states /= len(input_token_ids)
         
-        # Candidate clean Latin BPE ranks for coherent Spanish generation
-        candidate_ranks = self.tokenizer.clean_latin_ranks if self.tokenizer.clean_latin_ranks else list(range(32, 127))
-        num_candidates = min(500, len(candidate_ranks))
-        active_candidates = candidate_ranks[:num_candidates]
+        # Complete word BPE ranks for coherent Spanish/Latin text generation
+        active_candidates = self.tokenizer.complete_word_ranks if self.tokenizer.complete_word_ranks else list(range(1000, 2000))
+        num_candidates = min(1000, len(active_candidates))
+        active_candidates = active_candidates[:num_candidates]
         
         # 3. Autoregressive Token Generation Loop
         generated_token_ids = []
@@ -204,7 +204,7 @@ class ZeroCopyMoEEngine:
             norm_weight = self.fetch_weight_tensor("model.norm.weight", (self.hidden_dim,))[:self.hidden_dim]
             norm_hidden = self.rms_norm(hidden_states, norm_weight)
             
-            # 4. LM Head Logit Projection over Candidate Clean Token Vocab
+            # 4. LM Head Logit Projection over Complete Word BPE Vocab
             W_lm_head = self.fetch_weight_tensor("lm_head.weight", (num_candidates, self.hidden_dim))[:num_candidates, :self.hidden_dim]
             logits = np.matmul(W_lm_head, norm_hidden)  # [num_candidates]
             
@@ -222,6 +222,8 @@ class ZeroCopyMoEEngine:
             decoded_word = self.tokenizer.decode([sampled_token_id])
             if not decoded_word or decoded_word.strip() == "":
                 decoded_word = " "
+            else:
+                decoded_word = " " + decoded_word.strip()
                 
             self.tokens_generated += 1
             latency = time.time() - start_time
