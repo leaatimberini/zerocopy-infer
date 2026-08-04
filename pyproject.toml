@@ -32,5 +32,8 @@ dependencies = [
 Homepage = "https://github.com/leaatimberini/zerocopy-infer"
 Repository = "https://github.com/leaatimberini/zerocopy-infer.git"
 
+[project.scripts]
+zerocopy-infer = "zerocopy_infer.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["python"]
