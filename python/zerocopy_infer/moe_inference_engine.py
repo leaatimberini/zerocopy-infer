@@ -299,8 +299,10 @@ class ZeroCopyMoEEngine:
         W_embed_tensor = self.fetch_weight_tensor(embed_name, (163840, self.hidden_dim))
         W_embed_full = W_embed_tensor[:, :self.hidden_dim]
         
-        # Build active vocabulary matrix from clean Spanish/Latin BPE ranks
-        clean_ranks = getattr(self.tokenizer, "clean_latin_ranks", [])
+        # Build active vocabulary matrix from complete Spanish/Latin word BPE ranks
+        clean_ranks = getattr(self.tokenizer, "complete_word_ranks", [])
+        if not clean_ranks:
+            clean_ranks = getattr(self.tokenizer, "clean_latin_ranks", [])
         if not clean_ranks:
             clean_ranks = list(range(min(20000, W_embed_full.shape[0])))
             
