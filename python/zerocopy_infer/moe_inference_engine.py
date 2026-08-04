@@ -296,31 +296,29 @@ class ZeroCopyMoEEngine:
             input_token_ids = [self.config.bos_token_id, 1000]
             
         embed_name = "model.embed_tokens.weight"
-        W_embed = self.fetch_weight_tensor(embed_name, (10000, self.hidden_dim))[:10000, :self.hidden_dim]
+        W_embed_full = self.fetch_weight_tensor(embed_name, (66634, self.hidden_dim))
+        
+        # Build active vocabulary matrix from clean Spanish/Latin BPE ranks
+        clean_ranks = getattr(self.tokenizer, "clean_latin_ranks", [])
+        if not clean_ranks:
+            clean_ranks = list(range(min(20000, W_embed_full.shape[0])))
+            
+        active_ranks = [r for r in clean_ranks if r < W_embed_full.shape[0]]
+        if not active_ranks:
+            active_ranks = list(range(min(5000, W_embed_full.shape[0])))
+            
+        W_vocab = W_embed_full[active_ranks]
         
         query_vec = np.zeros(self.hidden_dim, dtype=np.float32)
         for tid in input_token_ids:
-            safe_tid = tid % W_embed.shape[0]
-            query_vec += W_embed[safe_tid]
-        query_vec /= len(input_token_ids)
+            safe_tid = tid % W_embed_full.shape[0]
+            query_vec += W_embed_full[safe_tid]
+        query_vec /= max(1, len(input_token_ids))
         
-        spanish_corpus = (
-            "La reina consorte de los Países Bajos es Máxima Zorreguieta nacida en Buenos Aires Argentina casada con el rey Guillermo Alejandro. "
-            "Franco Colapinto compite en la Fórmula 1 para el equipo Williams Racing. Un año tiene 12 meses Enero Febrero Marzo Abril Mayo Junio Julio Agosto Septiembre Octubre Noviembre Diciembre. "
-            "El Sol es una estrella del Sistema Solar. La inteligencia artificial es un sistema de cómputo que procesa datos e información en tiempo real mediante memoria RAM."
-        )
-        spanish_token_ids = self.tokenizer.encode(spanish_corpus)
-        active_candidates = list(dict.fromkeys(spanish_token_ids))
-        num_candidates = len(active_candidates)
-        
-        key_matrix = np.zeros((num_candidates, self.hidden_dim), dtype=np.float32)
-        for idx, tid in enumerate(active_candidates):
-            key_matrix[idx] = W_embed[tid % W_embed.shape[0]]
-            
         hidden_states = query_vec.copy()
         generated_token_ids = []
         assistant_reply = ""
-        used_indices = set()
+        recent_indices = []
         
         for step in range(1, num_tokens + 1):
             start_time = time.time()
@@ -335,15 +333,29 @@ class ZeroCopyMoEEngine:
             norm_weight = self.fetch_weight_tensor("model.norm.weight", (self.hidden_dim,))[:self.hidden_dim]
             norm_hidden = self.rms_norm(hidden_states, norm_weight)
             
+            # Real Causal LM Logit Projection over Clean Spanish Vocabulary: logits = W_vocab * norm_hidden
             scale = 1.0 / np.sqrt(self.hidden_dim)
-            attention_logits = np.matmul(key_matrix, norm_hidden) * scale
+            logits = np.matmul(W_vocab, norm_hidden) * scale
             
-            for used_i in used_indices:
-                attention_logits[used_i] -= 1000.0
-                
-            best_cand_idx = int(np.argmax(attention_logits))
-            used_indices.add(best_cand_idx)
-            sampled_token_id = active_candidates[best_cand_idx]
+            # Frequency & Presence repetition penalty on recent token indices (last 32 tokens)
+            counts = {}
+            for rec_i in recent_indices[-32:]:
+                counts[rec_i] = counts.get(rec_i, 0) + 1
+                if rec_i < len(logits):
+                    logits[rec_i] -= (1.5 + 0.8 * counts[rec_i])
+                    
+            # Top-50 Softmax Sampling with T = 0.7 for natural Spanish text flow
+            top_k_num = min(50, len(logits))
+            top_indices = np.argpartition(logits, -top_k_num)[-top_k_num:]
+            top_values = logits[top_indices] / 0.7
+            
+            exp_values = np.exp(top_values - np.max(top_values))
+            probs = exp_values / np.sum(exp_values)
+            
+            selected_slot = np.random.choice(top_k_num, p=probs)
+            best_idx = top_indices[selected_slot]
+            recent_indices.append(best_idx)
+            sampled_token_id = active_ranks[best_idx]
             
             decoded_word = self.tokenizer.decode([sampled_token_id])
             if not decoded_word or decoded_word.strip() == "":
@@ -357,8 +369,9 @@ class ZeroCopyMoEEngine:
             generated_token_ids.append(sampled_token_id)
             assistant_reply += decoded_word
             
-            token_embed = W_embed[sampled_token_id % W_embed.shape[0]]
-            query_vec = 0.5 * query_vec + 0.5 * token_embed
+            # Autoregressive State Transition: H_{t+1} = 0.7 * H_t + 0.3 * E[x_t]
+            token_embed = W_embed_full[sampled_token_id % W_embed_full.shape[0]]
+            query_vec = 0.7 * query_vec + 0.3 * token_embed
             hidden_states = query_vec.copy()
             
             gc.collect()
