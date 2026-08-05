@@ -9,7 +9,6 @@ eviction to prevent OOM process kills on memory-constrained mobile devices (Andr
 
 import os
 import gc
-import psutil
 from typing import Callable, Optional
 
 from python.zerocopy_infer.hardware_detector import detect_hardware
