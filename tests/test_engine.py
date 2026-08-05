@@ -171,5 +171,18 @@ class TestNetworkDiagnostics(unittest.TestCase):
         self.assertIsNotNone(run_network_diagnostics)
 
 
+class TestFP16Utils(unittest.TestCase):
+    def test_bf16_dequantization(self):
+        from python.zerocopy_infer.fp16_utils import dequantize_bf16_to_fp32, dequantize_fp16_to_fp32
+        # float32 1.0 is 0x3f800000 -> bfloat16 is 0x3f80
+        bf16_data = np.array([0x3f80], dtype=np.uint16).tobytes()
+        res_bf16 = dequantize_bf16_to_fp32(bf16_data)
+        self.assertAlmostEqual(res_bf16[0], 1.0, places=4)
+
+        fp16_data = np.array([1.0], dtype=np.float16).tobytes()
+        res_fp16 = dequantize_fp16_to_fp32(fp16_data)
+        self.assertAlmostEqual(res_fp16[0], 1.0, places=4)
+
+
 if __name__ == "__main__":
     unittest.main()
