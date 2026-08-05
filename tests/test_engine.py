@@ -126,5 +126,18 @@ class TestConfigWizard(unittest.TestCase):
         self.assertIsNotNone(run_config_wizard)
 
 
+class TestMemoryPressureGuard(unittest.TestCase):
+    def test_memory_guard(self):
+        from python.zerocopy_infer.memory_guard import MemoryPressureGuard
+        purged = [False]
+        def dummy_purge():
+            purged[0] = True
+            return 1024
+        guard = MemoryPressureGuard(target_max_ram_ratio=0.01, purge_callback=dummy_purge)
+        bytes_purged = guard.enforce_safety()
+        self.assertTrue(purged[0])
+        self.assertEqual(bytes_purged, 1024)
+
+
 if __name__ == "__main__":
     unittest.main()
