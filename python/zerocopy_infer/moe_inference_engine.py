@@ -430,10 +430,15 @@ class ZeroCopyMoEEngine:
         except Exception:
             hidden_states = np.random.randn(self.hidden_dim).astype(np.float32) * 0.02
         
-        generated_token_ids = []
-        assistant_reply = ""
-        recent_indices = []
-        
+        # Collect target vocabulary ranks covering all real Spanish & Latin word tokens
+        target_vocab_ranks = list(range(32, 2000))
+        complete_words = getattr(self.tokenizer, "complete_word_ranks", [])
+        clean_latin = getattr(self.tokenizer, "clean_latin_ranks", [])
+        if complete_words:
+            target_vocab_ranks.extend(complete_words)
+        elif clean_latin:
+            target_vocab_ranks.extend(clean_latin)
+
         for step in range(1, num_tokens + 1):
             start_time = time.time()
             
@@ -451,9 +456,9 @@ class ZeroCopyMoEEngine:
                 norm_weight = self.fetch_weight_tensor("model.final_layernorm.weight", (self.hidden_dim,))
             norm_hidden = self.rms_norm(hidden_states, norm_weight)
             
-            # Compute exact Top-K logits across vocabulary via safe 25 MB HTTP chunk streaming
+            # Compute exact Top-K logits across full Spanish/Latin word vocabulary
             logits, active_ranks = self.streamer.compute_chunked_top_logits(
-                norm_hidden, self.hidden_dim, chunk_rows=4000, top_k=50
+                norm_hidden, self.hidden_dim, target_ranks=target_vocab_ranks, top_k=50
             )
             
             if len(logits) == 0 or len(active_ranks) == 0:

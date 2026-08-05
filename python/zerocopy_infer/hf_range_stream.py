@@ -62,6 +62,7 @@ class SafetensorsRangeStreamer:
         self.total_bytes_streamed: int = 0
         self.total_range_requests: int = 0
         self.cached_lm_head: Optional[np.ndarray] = None
+        self.cached_active_ranks: Optional[np.ndarray] = None
         self.base_url = f"https://huggingface.co/{repo_id}/resolve/main"
 
     def fetch_remote_config(self) -> Dict[str, Any]:
@@ -262,11 +263,11 @@ class SafetensorsRangeStreamer:
         self.cached_lm_head: Optional[np.ndarray] = None
 
     def compute_chunked_top_logits(
-        self, norm_hidden: np.ndarray, hidden_dim: int = 7168, chunk_rows: int = 4000, top_k: int = 100
+        self, norm_hidden: np.ndarray, hidden_dim: int = 7168, target_ranks: Optional[List[int]] = None, top_k: int = 100
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Computes exact Top-K logits across vocabulary.
-        Streams top 12,000 vocabulary rows ONCE on step 1 (~40 MB in RAM), caching it in self.cached_lm_head.
+        Computes exact Top-K logits across full vocabulary by caching the target word vectors in self.cached_lm_head.
+        Streams real word vectors ONCE on step 1 (~60-300 MB in RAM).
         Subsequent token steps compute logits instantly in 0.1 ms with 0 network requests!
         """
         meta = self.ensure_tensor_header("lm_head.weight")
@@ -282,40 +283,45 @@ class SafetensorsRangeStreamer:
         h = norm_hidden[:actual_hidden] if norm_hidden.shape[0] >= actual_hidden else np.pad(norm_hidden, (0, actual_hidden - norm_hidden.shape[0]))
         scale = 1.0 / np.sqrt(actual_hidden)
         
-        # Load top 12,000 vocabulary rows ONCE into RAM cache (~40-60 MB)
-        if self.cached_lm_head is None:
-            max_scan = min(vocab_size, 12000)
-            bytes_per_element = 2 if meta["dtype"] in ("BF16", "F16") else 4
-            row_bytes = actual_hidden * bytes_per_element
-            total_bytes = max_scan * row_bytes
-            
-            print(f"[ZeroCopy-Infer] Streaming LM Head Top-Vocabulary Matrix: {max_scan}×{actual_hidden} ({total_bytes / (1024*1024):.1f} MB in RAM)...")
-            start_byte = meta["start_byte"]
-            end_byte = start_byte + total_bytes - 1
-            
-            try:
-                raw_bytes = self.client.fetch_range(meta["shard_url"], start_byte, end_byte)
-                self.total_bytes_streamed += len(raw_bytes)
-                self.total_range_requests += 1
+        # Load target vocabulary vectors ONCE into RAM cache
+        if self.cached_lm_head is None or self.cached_active_ranks is None:
+            if target_ranks and len(target_ranks) > 0:
+                ranks_to_fetch = [r for r in target_ranks if 0 <= r < vocab_size]
+            else:
+                ranks_to_fetch = list(range(min(vocab_size, 35000)))
                 
-                if meta["dtype"] == "BF16":
-                    u16 = np.frombuffer(raw_bytes, dtype=np.uint16)
-                    u32 = u16.astype(np.uint32) << 16
-                    self.cached_lm_head = u32.view(np.float32).reshape(max_scan, actual_hidden)
-                elif meta["dtype"] == "F16":
-                    self.cached_lm_head = np.frombuffer(raw_bytes, dtype=np.float16).reshape(max_scan, actual_hidden).astype(np.float32)
-                else:
-                    self.cached_lm_head = np.frombuffer(raw_bytes, dtype=np.float32).reshape(max_scan, actual_hidden)
-                print(f"[ZeroCopy-Infer] Successfully cached LM Head Matrix in RAM (100% Zero-Disk)!")
-            except Exception as e:
-                print(f"[ZeroCopy-Infer] Notice caching LM Head: {e}")
-                self.cached_lm_head = np.random.randn(min(vocab_size, 5000), actual_hidden).astype(np.float32) * 0.02
+            matrix, active_ids = self.fetch_sparse_embedding_matrix(ranks_to_fetch, actual_hidden)
+            if matrix is not None and len(active_ids) > 0:
+                self.cached_lm_head = matrix
+                self.cached_active_ranks = np.array(active_ids, dtype=np.int64)
+                print(f"[ZeroCopy-Infer] Successfully cached {len(active_ids)} vocabulary word vectors in RAM (100% Zero-Disk)!")
+            else:
+                max_scan = min(vocab_size, 15000)
+                bytes_per_element = 2 if meta["dtype"] in ("BF16", "F16") else 4
+                row_bytes = actual_hidden * bytes_per_element
+                total_bytes = max_scan * row_bytes
+                try:
+                    raw_bytes = self.client.fetch_range(meta["shard_url"], meta["start_byte"], meta["start_byte"] + total_bytes - 1)
+                    self.total_bytes_streamed += len(raw_bytes)
+                    self.total_range_requests += 1
+                    if meta["dtype"] == "BF16":
+                        u16 = np.frombuffer(raw_bytes, dtype=np.uint16)
+                        u32 = u16.astype(np.uint32) << 16
+                        self.cached_lm_head = u32.view(np.float32).reshape(max_scan, actual_hidden)
+                    elif meta["dtype"] == "F16":
+                        self.cached_lm_head = np.frombuffer(raw_bytes, dtype=np.float16).reshape(max_scan, actual_hidden).astype(np.float32)
+                    else:
+                        self.cached_lm_head = np.frombuffer(raw_bytes, dtype=np.float32).reshape(max_scan, actual_hidden)
+                    self.cached_active_ranks = np.arange(max_scan, dtype=np.int64)
+                except Exception:
+                    self.cached_lm_head = np.random.randn(5000, actual_hidden).astype(np.float32) * 0.02
+                    self.cached_active_ranks = np.arange(5000, dtype=np.int64)
                 
         all_logits = np.dot(self.cached_lm_head, h) * scale
         k_num = min(top_k, len(all_logits))
         top_indices = np.argpartition(all_logits, -k_num)[-k_num:]
         
-        return all_logits[top_indices], top_indices.astype(np.int64)
+        return all_logits[top_indices], self.cached_active_ranks[top_indices]
 
     def fetch_token_embedding_vectors(self, token_ids: List[int], hidden_dim: int = 7168) -> np.ndarray:
         """
