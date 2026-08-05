@@ -108,5 +108,11 @@ class TestZeroCopyContextManager(unittest.TestCase):
         self.assertEqual(ctx.cached_layers_count, 1)
 
 
+class TestWebDashboard(unittest.TestCase):
+    def test_dashboard_import(self):
+        from examples.web_dashboard import TelemetryHandler
+        self.assertIsNotNone(TelemetryHandler)
+
+
 if __name__ == "__main__":
     unittest.main()
