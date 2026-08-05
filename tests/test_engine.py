@@ -95,5 +95,18 @@ class TestUniversalTokenizer(unittest.TestCase):
         self.assertTrue("<|turn>model\nbuenas<turn|>" in prompt_multi)
 
 
+class TestZeroCopyContextManager(unittest.TestCase):
+    def test_kv_cache_sliding_window(self):
+        from python.zerocopy_infer.context_manager import ZeroCopyContextManager
+        ctx = ZeroCopyContextManager(max_context_length=100, sliding_window=10)
+        for i in range(25):
+            k = np.random.randn(64).astype(np.float32)
+            v = np.random.randn(64).astype(np.float32)
+            k_seq, v_seq = ctx.update_kv_cache(layer_idx=0, k_new=k, v_new=v)
+        self.assertEqual(k_seq.shape[0], 10)
+        self.assertEqual(v_seq.shape[0], 10)
+        self.assertEqual(ctx.cached_layers_count, 1)
+
+
 if __name__ == "__main__":
     unittest.main()
