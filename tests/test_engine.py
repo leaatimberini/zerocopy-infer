@@ -151,5 +151,11 @@ class TestZeroCopyClient(unittest.TestCase):
         self.assertIsNotNone(ZeroCopyClient)
 
 
+class TestLiveTelemetry(unittest.TestCase):
+    def test_telemetry_import(self):
+        from examples.live_telemetry import render_telemetry_dashboard
+        self.assertIsNotNone(render_telemetry_dashboard)
+
+
 if __name__ == "__main__":
     unittest.main()
