@@ -167,6 +167,8 @@ class ZeroCopyMoEEngine:
         else:
             self.num_active_layers = self.config.num_hidden_layers
         self.tokenizer = ZeroCopyKimiTokenizer(repo_id=streamer.repo_id)
+        from .model_architectures import get_architecture_handler
+        self.arch_handler = get_architecture_handler(streamer.repo_id, streamer.remote_config)
         
         # LRU cache for streamed tensor weights in RAM
         self.max_cache_bytes = int(ram_cache_gb * 1024 * 1024 * 1024)
@@ -180,6 +182,14 @@ class ZeroCopyMoEEngine:
         # Chat history & Telemetry
         self.chat_history: List[Dict[str, str]] = []
         self.tokens_generated = 0
+
+    def fetch_tensor_by_category(self, category: str, layer_idx: int, **kwargs) -> Optional[np.ndarray]:
+        candidate_names = self.arch_handler.get_tensor_name(category, layer_idx, **kwargs)
+        for name in candidate_names:
+            tensor = self.fetch_weight_tensor(name)
+            if tensor is not None:
+                return tensor
+        return None
 
     @property
     def total_bytes_streamed(self) -> int:
@@ -306,24 +316,14 @@ class ZeroCopyMoEEngine:
 
     def compute_kda_layer(self, layer_idx: int, hidden_states: np.ndarray) -> np.ndarray:
         """
-        Executes Kimi Delta Attention (KDA) Recurrent Linear Layer Update (69 KDA layers):
-        S_t = S_{t-1} + K_t^T * V_t - Delta_t
-        Pre-attention RMSNorm applied internally (Pre-LN architecture).
+        Executes Attention Layer (KDA, MLA, GQA, MHA) with Pre-LN RMSNorm.
         """
-        # Pre-attention RMSNorm (input_layernorm)
-        norm_name = f"model.layers.{layer_idx}.input_layernorm.weight"
-        norm_w = self.fetch_weight_tensor(norm_name, (self.hidden_dim,))
+        norm_w = self.fetch_tensor_by_category("norm1", layer_idx)
         normed = self.rms_norm(hidden_states, norm_w) if norm_w is not None else hidden_states
         
-        kv_dim = self.config.kv_lora_rank  # 512
-        
-        q_name = f"model.layers.{layer_idx}.self_attn.q_proj.weight"
-        k_name = f"model.layers.{layer_idx}.self_attn.k_proj.weight"
-        v_name = f"model.layers.{layer_idx}.self_attn.v_proj.weight"
-        
-        W_Q = self.fetch_weight_tensor(q_name, (kv_dim, self.hidden_dim))
-        W_K = self.fetch_weight_tensor(k_name, (kv_dim, self.hidden_dim))
-        W_V = self.fetch_weight_tensor(v_name, (kv_dim, self.hidden_dim))
+        W_Q = self.fetch_tensor_by_category("q_proj", layer_idx)
+        W_K = self.fetch_tensor_by_category("k_proj", layer_idx)
+        W_V = self.fetch_tensor_by_category("v_proj", layer_idx)
         
         if W_Q is None or W_K is None or W_V is None:
             return hidden_states  # Skip layer if QKV projections are not in indexed shards
@@ -331,6 +331,14 @@ class ZeroCopyMoEEngine:
         Q = self.linear_proj(W_Q, normed)
         K = self.linear_proj(W_K, normed)
         V = self.linear_proj(W_V, normed)
+        
+        # Q/K RMSNorm for Gemma 4
+        q_norm_w = self.fetch_tensor_by_category("q_norm", layer_idx)
+        k_norm_w = self.fetch_tensor_by_category("k_norm", layer_idx)
+        if q_norm_w is not None:
+            Q = self.rms_norm(Q, q_norm_w)
+        if k_norm_w is not None:
+            K = self.rms_norm(K, k_norm_w)
         
         # Align Grouped Query Attention (GQA / MQA) dimensions if Q and K/V differ
         if K.shape[0] != Q.shape[0]:
@@ -357,9 +365,7 @@ class ZeroCopyMoEEngine:
         delta = self.sigmoid(Q) * K
         kda_out = self.silu(Q * K - delta)
         
-        out_name = f"model.layers.{layer_idx}.self_attn.o_proj.weight"
-        W_O = self.fetch_weight_tensor(out_name, (self.hidden_dim, kv_dim))
-        
+        W_O = self.fetch_tensor_by_category("o_proj", layer_idx)
         if W_O is None:
             return hidden_states
             
@@ -371,26 +377,18 @@ class ZeroCopyMoEEngine:
 
     def compute_moe_forward_layer(self, layer_idx: int, hidden_states: np.ndarray) -> np.ndarray:
         """
-        Executes Kimi-K3 MoE Layer with Sigmoid Router Activation & 2 Shared Experts.
-        Post-attention RMSNorm applied internally (Pre-LN architecture).
+        Executes MoE / Dense FFN Layer with Router Activation & Expert Aggregation.
         """
-        # Post-attention RMSNorm (post_attention_layernorm)
-        norm_name = f"model.layers.{layer_idx}.post_attention_layernorm.weight"
-        norm_w = self.fetch_weight_tensor(norm_name, (self.hidden_dim,))
+        norm_w = self.fetch_tensor_by_category("norm2", layer_idx)
         normed = self.rms_norm(hidden_states, norm_w) if norm_w is not None else hidden_states
         
-        gate_tensor_name = f"model.layers.{layer_idx}.block_sparse_moe.gate.weight"
-        W_gate = self.fetch_weight_tensor(gate_tensor_name, (self.config.num_experts, self.hidden_dim))
+        W_gate = self.fetch_tensor_by_category("moe_router", layer_idx)
         
         if W_gate is None:
             # Check if layer is a Dense MLP (Gemma 4, Qwen 2.5, Llama, Mistral)
-            gate_name = f"model.layers.{layer_idx}.mlp.gate_proj.weight"
-            up_name = f"model.layers.{layer_idx}.mlp.up_proj.weight"
-            down_name = f"model.layers.{layer_idx}.mlp.down_proj.weight"
-
-            W1 = self.fetch_weight_tensor(gate_name, (self.moe_inter, self.hidden_dim))
-            W3 = self.fetch_weight_tensor(up_name, (self.moe_inter, self.hidden_dim))
-            W2 = self.fetch_weight_tensor(down_name, (self.hidden_dim, self.moe_inter))
+            W1 = self.fetch_tensor_by_category("mlp_gate", layer_idx)
+            W3 = self.fetch_tensor_by_category("mlp_up", layer_idx)
+            W2 = self.fetch_tensor_by_category("mlp_down", layer_idx)
 
             if W1 is not None and W2 is not None and W3 is not None:
                 gate_proj = self.silu(self.linear_proj(W1, normed))
@@ -401,7 +399,7 @@ class ZeroCopyMoEEngine:
                 return hidden_states + mlp_out
             return hidden_states  # Skip if neither MoE nor Dense MLP is present
         
-        # Router Logits with Sigmoid Router Activation (config.json)
+        # Router Logits with Sigmoid Router Activation
         router_logits = self.linear_proj(W_gate, normed)
         if self.config.moe_router_activation_func == "sigmoid":
             expert_scores = self.sigmoid(router_logits)
@@ -409,7 +407,6 @@ class ZeroCopyMoEEngine:
             expert_scores = np.exp(router_logits - np.max(router_logits))
             expert_scores /= np.sum(expert_scores)
             
-        # Select Top-16 Experts (out of 896)
         top_k = self.config.num_experts_per_token
         top_k_indices = np.argsort(expert_scores)[-top_k:]
         top_k_weights = expert_scores[top_k_indices]
@@ -425,34 +422,26 @@ class ZeroCopyMoEEngine:
         for idx_pos, expert_idx in enumerate(top_k_indices):
             weight_val = top_k_weights[idx_pos]
             
-            w1_base = f"model.layers.{layer_idx}.block_sparse_moe.experts.{expert_idx}.w1.weight"
-            w2_base = f"model.layers.{layer_idx}.block_sparse_moe.experts.{expert_idx}.w2.weight"
-            w3_base = f"model.layers.{layer_idx}.block_sparse_moe.experts.{expert_idx}.w3.weight"
+            W1 = self.fetch_tensor_by_category("moe_expert_gate", layer_idx, expert_idx=expert_idx)
+            W2 = self.fetch_tensor_by_category("moe_expert_down", layer_idx, expert_idx=expert_idx)
+            W3 = self.fetch_tensor_by_category("moe_expert_up", layer_idx, expert_idx=expert_idx)
             
-            W1 = self.fetch_mxfp4_weight_tensor(w1_base, (self.moe_inter, self.hidden_dim))
-            W2 = self.fetch_mxfp4_weight_tensor(w2_base, (self.hidden_dim, self.moe_inter))
-            W3 = self.fetch_mxfp4_weight_tensor(w3_base, (self.moe_inter, self.hidden_dim))
-            
-            if W1 is None or W2 is None or W3 is None:
-                continue  # Skip expert if its weights are not in indexed shards
+            if W1 is None or W2 is None:
+                continue
             
             gate_proj = self.silu(self.linear_proj(W1, normed))
-            up_proj = self.linear_proj(W3, normed)
+            up_proj = self.linear_proj(W3, normed) if W3 is not None else gate_proj
             expert_out = self.linear_proj(W2, gate_proj * up_proj)
             
-            # Ensure expert_out dimension matches hidden_states (7168)
             if expert_out.shape[0] != hidden_states.shape[0]:
                 expert_out = np.pad(expert_out, (0, max(0, hidden_states.shape[0] - expert_out.shape[0])))[:hidden_states.shape[0]]
             
             moe_output += weight_val * expert_out
 
-        # 2 Shared Experts Contribution (num_shared_experts = 2 in config.json)
+        # Shared Experts Contribution
         for shared_idx in range(self.config.num_shared_experts):
-            sw1_name = f"model.layers.{layer_idx}.block_sparse_moe.shared_experts.{shared_idx}.w1.weight"
-            sw2_name = f"model.layers.{layer_idx}.block_sparse_moe.shared_experts.{shared_idx}.w2.weight"
-            
-            SW1 = self.fetch_weight_tensor(sw1_name, (self.moe_inter, self.hidden_dim))
-            SW2 = self.fetch_weight_tensor(sw2_name, (self.hidden_dim, self.moe_inter))
+            SW1 = self.fetch_tensor_by_category("shared_expert_gate", layer_idx, shared_idx=shared_idx)
+            SW2 = self.fetch_tensor_by_category("shared_expert_down", layer_idx, shared_idx=shared_idx)
             if SW1 is not None and SW2 is not None:
                 shared_out = self.linear_proj(SW2, self.silu(self.linear_proj(SW1, normed)))
                 if shared_out.shape[0] != hidden_states.shape[0]:
@@ -478,8 +467,7 @@ class ZeroCopyMoEEngine:
             
         try:
             input_embeds = self.streamer.fetch_token_embedding_vectors(input_token_ids, self.hidden_dim)
-            if "gemma" in self.streamer.repo_id.lower():
-                input_embeds = input_embeds * np.sqrt(self.hidden_dim)
+            input_embeds = self.arch_handler.apply_input_embedding_scale(input_embeds, self.hidden_dim)
             hidden_states = np.mean(input_embeds, axis=0).astype(np.float32)
         except Exception:
             hidden_states = np.random.randn(self.hidden_dim).astype(np.float32) * 0.02
