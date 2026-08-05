@@ -1,0 +1,21 @@
+{
+  "engine": "ZeroCopy-Infer 1.0.0",
+  "author": "Leandro Emanuel Timberini (Ituzaing\u00f3, Buenos Aires, Argentina)",
+  "hardware": {
+    "arch": "amd64",
+    "system": "Windows",
+    "cpu_count": 12,
+    "simd_extension": "AVX2",
+    "ram_available_gb": 10.562714385986327,
+    "ram_total_gb": 15.089591979980469
+  },
+  "supported_models_count": 6,
+  "supported_model_keys": [
+    "gemma4",
+    "kimi_k3",
+    "mimo",
+    "deepseek_v3",
+    "qwen2",
+    "mixtral"
+  ]
+}

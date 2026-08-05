@@ -190,7 +190,7 @@ class TestNetworkDiagnostics(unittest.TestCase):
 
 class TestFP16Utils(unittest.TestCase):
     def test_bf16_dequantization(self):
-        from python.zerocopy_infer.fp16_utils import dequantize_bf16_to_fp32, dequantize_fp16_to_fp32
+        from zerocopy_infer.fp16_utils import dequantize_bf16_to_fp32, dequantize_fp16_to_fp32
         # float32 1.0 is 0x3f800000 -> bfloat16 is 0x3f80
         bf16_data = np.array([0x3f80], dtype=np.uint16).tobytes()
         res_bf16 = dequantize_bf16_to_fp32(bf16_data)
@@ -199,6 +199,14 @@ class TestFP16Utils(unittest.TestCase):
         fp16_data = np.array([1.0], dtype=np.float16).tobytes()
         res_fp16 = dequantize_fp16_to_fp32(fp16_data)
         self.assertAlmostEqual(res_fp16[0], 1.0, places=4)
+
+
+class TestExportSpecs(unittest.TestCase):
+    def test_export_specs(self):
+        from examples.export_specs import export_system_specs
+        specs = export_system_specs()
+        self.assertIn("engine", specs)
+        self.assertIn("hardware", specs)
 
 
 if __name__ == "__main__":

@@ -303,5 +303,14 @@ def get_architecture_handler(repo_id: str, config_dict: Dict[str, Any]) -> BaseA
     elif "mixtral" in repo_lower or "mistral" in repo_lower:
         return MixtralArchitectureHandler(config_dict)
     else:
-        # Default fallback to Kimi K3 handler
         return KimiK3ArchitectureHandler(config_dict)
+
+
+MODEL_ARCH_REGISTRY: Dict[str, Any] = {
+    "gemma4": Gemma4ArchitectureHandler,
+    "kimi_k3": KimiK3ArchitectureHandler,
+    "mimo": XiaomiMiMoArchitectureHandler,
+    "deepseek_v3": DeepSeekV3ArchitectureHandler,
+    "qwen2": Qwen25ArchitectureHandler,
+    "mixtral": MixtralArchitectureHandler,
+}
