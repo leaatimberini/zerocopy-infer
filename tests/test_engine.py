@@ -114,5 +114,11 @@ class TestWebDashboard(unittest.TestCase):
         self.assertIsNotNone(TelemetryHandler)
 
 
+class TestBenchmark(unittest.TestCase):
+    def test_benchmark_import(self):
+        from examples.benchmark import run_benchmark
+        self.assertIsNotNone(run_benchmark)
+
+
 if __name__ == "__main__":
     unittest.main()
