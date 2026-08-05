@@ -157,5 +157,13 @@ class TestLiveTelemetry(unittest.TestCase):
         self.assertIsNotNone(render_telemetry_dashboard)
 
 
+class TestGenerateDocs(unittest.TestCase):
+    def test_generate_docs(self):
+        from examples.generate_docs import generate_architecture_specs_markdown
+        doc = generate_architecture_specs_markdown()
+        self.assertTrue("Google Gemma 4" in doc)
+        self.assertTrue("Kimi K3" in doc)
+
+
 if __name__ == "__main__":
     unittest.main()
