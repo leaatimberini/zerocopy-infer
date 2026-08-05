@@ -281,6 +281,27 @@ class ZeroCopyMoEEngine:
         K = self.linear_proj(W_K, normed)
         V = self.linear_proj(W_V, normed)
         
+        # Align Grouped Query Attention (GQA / MQA) dimensions if Q and K/V differ
+        if K.shape[0] != Q.shape[0]:
+            if K.shape[0] < Q.shape[0]:
+                reps = Q.shape[0] // K.shape[0]
+                if reps > 1 and Q.shape[0] % K.shape[0] == 0:
+                    K = np.tile(K, reps)
+                else:
+                    K = np.pad(K, (0, Q.shape[0] - K.shape[0]))[:Q.shape[0]]
+            else:
+                K = K[:Q.shape[0]]
+
+        if V.shape[0] != Q.shape[0]:
+            if V.shape[0] < Q.shape[0]:
+                reps = Q.shape[0] // V.shape[0]
+                if reps > 1 and Q.shape[0] % V.shape[0] == 0:
+                    V = np.tile(V, reps)
+                else:
+                    V = np.pad(V, (0, Q.shape[0] - V.shape[0]))[:Q.shape[0]]
+            else:
+                V = V[:Q.shape[0]]
+        
         # Delta Attention Recurrent State Projection
         delta = self.sigmoid(Q) * K
         kda_out = self.silu(Q * K - delta)
