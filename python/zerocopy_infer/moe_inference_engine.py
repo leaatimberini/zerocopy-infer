@@ -192,6 +192,19 @@ class ZeroCopyMoEEngine:
                 return tensor
         return None
 
+    def clear_lru_cache(self) -> int:
+        """
+        Clears all cached tensors in RAM and releases memory back to system OS.
+        Returns number of bytes freed.
+        """
+        with self.cache_lock:
+            bytes_freed = self.current_cache_bytes
+            self.tensor_lru_cache.clear()
+            self.current_cache_bytes = 0
+            gc.collect()
+            print(f"[ZeroCopy-Infer] Emergency LRU RAM Cache Purged: {bytes_freed / (1024*1024):.1f} MB freed.")
+            return bytes_freed
+
     @property
     def total_bytes_streamed(self) -> int:
         return self.streamer.total_bytes_streamed

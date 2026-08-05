@@ -375,9 +375,31 @@ class SafetensorsRangeStreamer:
         """
         Streams exact bfloat16 embedding vectors for a list of token IDs directly from HF.
         """
-        meta = self.ensure_tensor_header("model.embed_tokens.weight")
-        if meta is None:
-            meta = self.ensure_tensor_header("embed_tokens.weight")
+    def _find_embed_tokens_meta(self) -> Optional[Dict[str, Any]]:
+        candidates = [
+            "model.embed_tokens.weight",
+            "model.language_model.embed_tokens.weight",
+            "language_model.model.embed_tokens.weight",
+            "embed_tokens.weight",
+            "language_model.embed_tokens.weight",
+            "model.layers.0.embed_tokens.weight"
+        ]
+        for name in candidates:
+            meta = self.ensure_tensor_header(name)
+            if meta is not None:
+                return meta
+        for tname in list(self.shard_index.keys()):
+            if "embed_tokens" in tname:
+                meta = self.ensure_tensor_header(tname)
+                if meta is not None:
+                    return meta
+        return None
+
+    def fetch_token_embedding_vectors(self, token_ids: List[int], hidden_dim: int = 7168) -> np.ndarray:
+        """
+        Fetch embedding vectors for a list of token IDs in RAM.
+        """
+        meta = self._find_embed_tokens_meta()
             
         if meta is None:
             return np.random.randn(len(token_ids), hidden_dim).astype(np.float32) * 0.02
@@ -415,7 +437,7 @@ class SafetensorsRangeStreamer:
         Downloads a contiguous block of embedding rows [start_row, start_row+num_rows)
         in a SINGLE HTTP Range Request.
         """
-        meta = self.ensure_tensor_header("model.embed_tokens.weight")
+        meta = self._find_embed_tokens_meta()
         if meta is None:
             return None
             
@@ -443,13 +465,13 @@ class SafetensorsRangeStreamer:
             return np.frombuffer(raw_bytes, dtype=np.float32).reshape(num_rows, actual_hidden)
 
     def fetch_sparse_embedding_matrix(
-        self, token_ids: List[int], hidden_dim: int = 7168, max_gap_rows: int = 250
+        self, token_ids: List[int], hidden_dim: int = 7168, max_gap_rows: int = 1000
     ) -> Tuple[Optional[np.ndarray], List[int]]:
         """
         Stream embeddings for an arbitrary set of token IDs (e.g. Spanish vocabulary)
         by clustering nearby token IDs into a minimal set of HTTP Range Requests.
         """
-        meta = self.ensure_tensor_header("model.embed_tokens.weight")
+        meta = self._find_embed_tokens_meta()
         if meta is None:
             return None, []
 

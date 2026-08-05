@@ -96,22 +96,30 @@ def main():
         selected_repo = PRESET_MODELS[1]["repo_id"]
         selected_name = PRESET_MODELS[1]["name"]
 
-    print(f"\n✅ Modelo seleccionado: {selected_name} ({selected_repo})")
-
-    layers_raw = input("Número de capas a ejecutar (por defecto: 2 para celular / 4 para PC): ").strip()
-    layers = int(layers_raw) if layers_raw.isdigit() else 2
-
-    cache_raw = input("Límite de Cache RAM en GB (por defecto: 2.0): ").strip()
-    try:
-        cache_gb = float(cache_raw) if cache_raw else 2.0
-    except ValueError:
-        cache_gb = 2.0
-
-    tokens_raw = input("Número de tokens a generar (por defecto: 5): ").strip()
-    tokens = int(tokens_raw) if tokens_raw.isdigit() else 5
-
     from .hardware_detector import detect_hardware
     hw = detect_hardware()
+    is_mobile = hw["system"] == "Android" or hw["arch"] in ("aarch64", "arm64")
+
+    default_layers = 1 if is_mobile else 4
+    default_cache = 0.75 if is_mobile else 3.0
+
+    print(f"\n✅ Modelo seleccionado: {selected_name} ({selected_repo})")
+
+    layers_raw = input(f"Número de capas a ejecutar (por defecto: {default_layers} para {'celular' if is_mobile else 'PC'}): ").strip()
+    layers = int(layers_raw) if layers_raw.isdigit() else default_layers
+
+    cache_raw = input(f"Límite de Cache RAM en GB (por defecto: {default_cache} GB para celular): ").strip()
+    try:
+        cache_gb = float(cache_raw) if cache_raw else default_cache
+    except ValueError:
+        cache_gb = default_cache
+
+    if is_mobile and cache_gb > 1.5:
+        print(f"\033[93m[Aviso de Seguridad Móvil] Ajustando caché RAM a 1.2 GB para evitar cierre de Termux por el SO Android.\033[0m")
+        cache_gb = 1.2
+
+    tokens_raw = input("Número de tokens a generar (por defecto: 10): ").strip()
+    tokens = int(tokens_raw) if tokens_raw.isdigit() else 10
 
     print("\n--------------------------------------------------------------------------------")
     print(f"🚀 Iniciando Streaming Inferencia Zero-Disk en {selected_repo}...")
@@ -119,7 +127,7 @@ def main():
     print("\n\033[96m[Hardware Status Dashboard]\033[0m")
     print(f" 💻 Architecture: {hw['arch']} | CPU Cores: {hw['cpu_count']} ({hw['system']})")
     print(f" ⚡ SIMD Acceleration: {hw['simd_extension']}")
-    print(f" 💾 Available RAM: {hw['ram_available_gb']:.2f} GB / Total: {hw['ram_total_gb']:.2f} GB (Cache Limit: {cache_gb} GB)")
+    print(f" 💾 Available RAM: {hw['ram_available_gb']:.2f} GB / Total: {hw['ram_total_gb']:.2f} GB (Safe Limit: {cache_gb:.2f} GB)")
     print(f" 📚 Active Layers: {layers}")
     print("--------------------------------------------------------------------------------\n")
 
@@ -141,6 +149,14 @@ def main():
         ram_cache_gb=cache_gb,
         num_active_layers=layers,
     )
+
+    # Attach MemoryPressureGuard for proactive RAM safety
+    try:
+        from .memory_guard import MemoryPressureGuard
+        guard = MemoryPressureGuard(target_max_ram_ratio=0.85, purge_callback=engine.clear_lru_cache)
+        guard.enforce_safety()
+    except Exception:
+        pass
 
     print(f"\n[3/3] Step 3: Iniciando Chat Interactivo Agentic (escribe 'exit' o 'quit' para salir)")
     print("--------------------------------------------------------------------------------")
