@@ -401,23 +401,17 @@ class ZeroCopyMoEEngine:
         if not input_token_ids:
             input_token_ids = [self.config.bos_token_id, 1000]
             
-        # === SPANISH VOCABULARY FILTER: Stream exact embeddings for Spanish words & punctuation ===
-        spanish_ranks = list(range(32, 127))  # ASCII, space, punctuation, numbers
-        complete_words = getattr(self.tokenizer, "complete_word_ranks", [])
-        clean_latin = getattr(self.tokenizer, "clean_latin_ranks", [])
+        # === REAL FULL-VOCABULARY LM HEAD PROJECTION MATRIX ===
+        # Streams the exact output projection matrix (lm_head.weight / embed_tokens.weight) from HF
+        W_vocab, total_v = self.streamer.fetch_full_lm_head_matrix(self.hidden_dim)
         
-        if complete_words:
-            spanish_ranks.extend(complete_words[:2500])
-        elif clean_latin:
-            spanish_ranks.extend(clean_latin[:2500])
-            
-        W_vocab, active_ranks = self.streamer.fetch_sparse_embedding_matrix(spanish_ranks, self.hidden_dim)
-        
-        if W_vocab is None or len(active_ranks) == 0:
-            # Fallback to contiguous block if sparse fetch fails
+        if W_vocab is not None:
+            active_ranks = list(range(total_v))
+        else:
+            # Fallback to contiguous block if full load fails
             max_vocab = min(5000, self.config.vocab_size)
             W_vocab = self.streamer.fetch_embedding_block(0, max_vocab, self.hidden_dim)
-            active_ranks = list(range(max_vocab))
+            active_ranks = list(range(max_vocab if W_vocab is not None else 5000))
             if W_vocab is None:
                 W_vocab = np.random.randn(max_vocab, self.hidden_dim).astype(np.float32) * 0.02
         
