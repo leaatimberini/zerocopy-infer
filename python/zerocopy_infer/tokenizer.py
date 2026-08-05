@@ -15,7 +15,7 @@ Supports native remote streaming of tokenizers directly from Hugging Face LFS / 
 import base64
 import json
 import urllib.request
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, Union
 
 OPEN_TOKEN = "<|open|>"
 CLOSE_TOKEN = "<|close|>"
