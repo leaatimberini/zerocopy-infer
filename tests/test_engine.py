@@ -145,5 +145,11 @@ class TestOpenAIApiServer(unittest.TestCase):
         self.assertIsNotNone(OpenAIApiHandler)
 
 
+class TestZeroCopyClient(unittest.TestCase):
+    def test_client_import(self):
+        from python.zerocopy_infer.client import ZeroCopyClient
+        self.assertIsNotNone(ZeroCopyClient)
+
+
 if __name__ == "__main__":
     unittest.main()
