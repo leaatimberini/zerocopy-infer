@@ -14,36 +14,79 @@ import urllib.error
 import numpy as np
 from typing import Dict, Any, Tuple, Optional, List
 
+import http.client
+import urllib.parse
+import time
+
 class HFRangeClient:
     """
-    HTTP Client that executes byte-level Range Requests against Hugging Face URLs
-    without saving any data to local disk.
+    High-Performance HTTP Client executing byte-level Range Requests against Hugging Face URLs
+    with persistent TLS connection pooling and zero local disk I/O.
     """
-    def __init__(self, token: Optional[str] = None, timeout: float = 120.0):
+    def __init__(self, token: Optional[str] = None, timeout: float = 60.0):
         self.token = token
         self.timeout = timeout
         self.headers = {
-            "User-Agent": "ZeroCopy-Infer/0.8.5 (Leandro Timberini AGI Engine)"
+            "User-Agent": "ZeroCopy-Infer/1.0.0 (Leandro Timberini Zero-Disk MoE Engine)",
+            "Connection": "keep-alive",
+            "Accept-Encoding": "identity"
         }
         if token:
             self.headers["Authorization"] = f"Bearer {token}"
+        self._connections: Dict[str, http.client.HTTPSConnection] = {}
+
+    def _get_connection(self, host: str, port: int = 443) -> http.client.HTTPSConnection:
+        if host not in self._connections:
+            self._connections[host] = http.client.HTTPSConnection(host, port=port, timeout=self.timeout)
+        return self._connections[host]
 
     def fetch_range(self, url: str, start_byte: int, end_byte: int) -> bytes:
         """
-        Fetch a specific range [start_byte, end_byte] from HF CDN into RAM.
+        Fetch a specific range [start_byte, end_byte] from HF CDN with Keep-Alive connection pooling.
         Returns raw bytes.
         """
-        req = urllib.request.Request(url, headers=self.headers)
-        req.add_header("Range", f"bytes={start_byte}-{end_byte}")
-        
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+        parsed = urllib.parse.urlparse(url)
+        host = parsed.netloc
+        path = parsed.path
+        if parsed.query:
+            path += "?" + parsed.query
+
+        headers = dict(self.headers)
+        headers["Range"] = f"bytes={start_byte}-{end_byte}"
+
+        retries = 3
+        backoff = 0.1
+
+        for attempt in range(retries):
+            try:
+                conn = self._get_connection(host)
+                conn.request("GET", path, headers=headers)
+                resp = conn.getresponse()
                 if resp.status in (200, 206):
-                    return resp.read()
-                else:
-                    raise IOError(f"HTTP Range request failed with status {resp.status}")
-        except Exception as e:
-            raise IOError(f"Failed to fetch bytes {start_byte}-{end_byte} from {url}: {e}")
+                    data = resp.read()
+                    return data
+                elif resp.status in (301, 302, 307, 308):
+                    redirect_url = resp.getheader("Location")
+                    if redirect_url:
+                        return self.fetch_range(redirect_url, start_byte, end_byte)
+                raise IOError(f"HTTP Range request failed with status {resp.status}")
+            except Exception as e:
+                # Reset connection on error
+                if host in self._connections:
+                    try:
+                        self._connections[host].close()
+                    except Exception:
+                        pass
+                    del self._connections[host]
+                if attempt == retries - 1:
+                    # Fallback to urllib standard request
+                    req = urllib.request.Request(url, headers=headers)
+                    with urllib.request.urlopen(req, timeout=self.timeout) as fallback_resp:
+                        if fallback_resp.status in (200, 206):
+                            return fallback_resp.read()
+                        raise IOError(f"Failed to fetch bytes {start_byte}-{end_byte} from {url}: {e}")
+                time.sleep(backoff)
+                backoff *= 2.5
 
 class SafetensorsRangeStreamer:
     """
