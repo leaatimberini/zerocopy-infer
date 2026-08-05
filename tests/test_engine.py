@@ -220,5 +220,15 @@ class TestVocabIndexCache(unittest.TestCase):
         self.assertNotIn(30, ranks)
 
 
+class TestTensorNormalizer(unittest.TestCase):
+    def test_sanitize_tensor(self):
+        from zerocopy_infer.tensor_normalizer import TensorNormalizer
+        bad_arr = np.array([np.nan, np.inf, -np.inf, 5.0], dtype=np.float32)
+        clean = TensorNormalizer.sanitize_tensor(bad_arr, clip_val=10.0)
+        self.assertFalse(np.isnan(clean).any())
+        self.assertFalse(np.isinf(clean).any())
+        self.assertEqual(clean[3], 5.0)
+
+
 if __name__ == "__main__":
     unittest.main()
