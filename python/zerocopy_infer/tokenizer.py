@@ -171,8 +171,10 @@ class UniversalHFTokenizer:
         """
         target_repo = (repo_id or self.repo_id).lower()
         
-        if "gemma" in target_repo:
-            return f"<start_of_turn>user\n{user_prompt}<end_of_turn>\n<start_of_turn>model\n"
+        if "gemma-4" in target_repo or "gemma4" in target_repo:
+            return f"<bos><|turn>user\n{user_prompt}<turn|>\n<|turn>model\n<|channel>thought\n<channel|>"
+        elif "gemma" in target_repo:
+            return f"<bos><start_of_turn>user\n{user_prompt}<end_of_turn>\n<start_of_turn>model\n"
         elif "qwen" in target_repo or "mimo" in target_repo:
             return f"<|im_start|>user\n{user_prompt}<|im_end|>\n<|im_start|>assistant\n"
         elif "deepseek" in target_repo:

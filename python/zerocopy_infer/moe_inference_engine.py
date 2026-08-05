@@ -424,6 +424,8 @@ class ZeroCopyMoEEngine:
             
         try:
             input_embeds = self.streamer.fetch_token_embedding_vectors(input_token_ids, self.hidden_dim)
+            if "gemma" in self.streamer.repo_id.lower():
+                input_embeds = input_embeds * np.sqrt(self.hidden_dim)
             hidden_states = np.mean(input_embeds, axis=0).astype(np.float32)
         except Exception:
             hidden_states = np.random.randn(self.hidden_dim).astype(np.float32) * 0.02

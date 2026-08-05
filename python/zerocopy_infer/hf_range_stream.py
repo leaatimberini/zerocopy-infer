@@ -93,21 +93,24 @@ class SafetensorsRangeStreamer:
                 weight_map = data.get("weight_map", {})
                 for tensor_name, shard_file in weight_map.items():
                     self.shard_index[tensor_name] = shard_file
-                    # Comprehensive aliases for model naming variations across HF repos
-                    clean_name = tensor_name.replace("language_model.", "").replace("model.", "")
+                    # Comprehensive aliases for model naming variations across HF repos (Gemma 4, Llama, Qwen, DeepSeek, MiMo, Kimi)
+                    clean_name = tensor_name.replace("model.language_model.", "").replace("language_model.model.", "").replace("language_model.", "").replace("model.", "")
                     self.shard_index[clean_name] = shard_file
                     self.shard_index[f"model.{clean_name}"] = shard_file
+                    self.shard_index[f"model.language_model.{clean_name}"] = shard_file
                     self.shard_index[f"language_model.model.{clean_name}"] = shard_file
                     
                     if "embed_tokens" in tensor_name or "embed" in tensor_name:
                         self.shard_index["model.embed_tokens.weight"] = shard_file
                         self.shard_index["embed_tokens.weight"] = shard_file
+                        self.shard_index["model.language_model.embed_tokens.weight"] = shard_file
                         self.shard_index["language_model.model.embed_tokens.weight"] = shard_file
                         
                     if "norm" in tensor_name and "weight" in tensor_name:
                         if "input_layernorm" not in tensor_name and "post_attention" not in tensor_name:
                             self.shard_index["model.norm.weight"] = shard_file
                             self.shard_index["language_model.model.norm.weight"] = shard_file
+                            self.shard_index["model.language_model.norm.weight"] = shard_file
                             self.shard_index["model.final_layernorm.weight"] = shard_file
                 print(f"[ZeroCopy-Infer] Successfully indexed {len(weight_map)} global model tensors across all 96 shards (100% Zero-Disk)!")
                 return True
@@ -228,16 +231,17 @@ class SafetensorsRangeStreamer:
         Ensures a tensor's header metadata is parsed into self.tensor_map.
         Tries multiple model alias names and lazy-loads the shard header on demand.
         """
+        clean = tensor_name.replace("model.language_model.", "").replace("language_model.model.", "").replace("language_model.", "").replace("model.", "")
         candidates = [
             tensor_name,
-            f"language_model.model.{tensor_name.replace('model.', '')}",
-            f"model.{tensor_name.replace('language_model.model.', '').replace('model.', '')}",
-            tensor_name.replace("language_model.", ""),
-            tensor_name.replace("language_model.model.", ""),
+            f"model.language_model.{clean}",
+            f"language_model.model.{clean}",
+            f"model.{clean}",
+            clean,
             "lm_head.weight",
-            "language_model.lm_head.weight",
-            "model.embed_tokens.weight",
+            "model.language_model.embed_tokens.weight",
             "language_model.model.embed_tokens.weight",
+            "model.embed_tokens.weight",
             "embed_tokens.weight",
         ]
         # 1. Check if already parsed in tensor_map
