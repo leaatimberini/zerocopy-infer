@@ -20,6 +20,8 @@ import json
 import numpy as np
 from typing import Dict, List, Optional, Tuple, Generator, Any
 from collections import OrderedDict
+import threading
+import concurrent.futures
 from .hf_range_stream import SafetensorsRangeStreamer
 from .tokenizer import ZeroCopyKimiTokenizer
 from .mxfp4_dequant import dequantize_mxfp4
@@ -156,6 +158,10 @@ class ZeroCopyMoEEngine:
         self.max_cache_bytes = int(ram_cache_gb * 1024 * 1024 * 1024)
         self.tensor_lru_cache: OrderedDict[str, np.ndarray] = OrderedDict()
         self.current_cache_bytes = 0
+        self.cache_lock = threading.Lock()
+        
+        # Thread pool for async layer prefetching
+        self.prefetch_executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
         
         # Chat history & Telemetry
         self.chat_history: List[Dict[str, str]] = []
@@ -173,10 +179,12 @@ class ZeroCopyMoEEngine:
         """
         Stream exact weight slice over HTTP Range Request directly into RAM.
         Returns None if tensor is not present in indexed shards (enabling fast skip).
+        Thread-safe for concurrent prefetching.
         """
-        if tensor_name in self.tensor_lru_cache:
-            self.tensor_lru_cache.move_to_end(tensor_name)
-            return self.tensor_lru_cache[tensor_name]
+        with self.cache_lock:
+            if tensor_name in self.tensor_lru_cache:
+                self.tensor_lru_cache.move_to_end(tensor_name)
+                return self.tensor_lru_cache[tensor_name]
         
         meta = self.streamer.ensure_tensor_header(tensor_name)
         if meta is None:
@@ -185,14 +193,16 @@ class ZeroCopyMoEEngine:
         try:
             arr = self.streamer.fetch_tensor(tensor_name)
             arr_bytes = arr.nbytes
-            while self.current_cache_bytes + arr_bytes > self.max_cache_bytes and self.tensor_lru_cache:
-                k, evicted_arr = self.tensor_lru_cache.popitem(last=False)
-                self.current_cache_bytes -= evicted_arr.nbytes
-                del evicted_arr
-                gc.collect()
-                
-            self.tensor_lru_cache[tensor_name] = arr
-            self.current_cache_bytes += arr_bytes
+            
+            with self.cache_lock:
+                while self.current_cache_bytes + arr_bytes > self.max_cache_bytes and self.tensor_lru_cache:
+                    k, evicted_arr = self.tensor_lru_cache.popitem(last=False)
+                    self.current_cache_bytes -= evicted_arr.nbytes
+                    del evicted_arr
+                    gc.collect()
+                    
+                self.tensor_lru_cache[tensor_name] = arr
+                self.current_cache_bytes += arr_bytes
             return arr
         except Exception:
             return None
@@ -442,8 +452,16 @@ class ZeroCopyMoEEngine:
         for step in range(1, num_tokens + 1):
             start_time = time.time()
             
+            # Start prefetching layer 0 if needed
+            if self.num_active_layers > 0:
+                self.prefetch_executor.submit(self._prefetch_layer_weights, 0)
+            
             # Pass hidden state through Transformer Layers (Attention + MoE per layer)
             for layer_idx in range(self.num_active_layers):
+                # Submit prefetch for the next layer
+                if layer_idx + 1 < self.num_active_layers:
+                    self.prefetch_executor.submit(self._prefetch_layer_weights, layer_idx + 1)
+                    
                 # Attention sub-layer with pre-norm (KDA approximation for all layer types)
                 hidden_states = self.compute_kda_layer(layer_idx, hidden_states)
                 # MoE FFN sub-layer with pre-norm

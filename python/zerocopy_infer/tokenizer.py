@@ -160,38 +160,89 @@ class UniversalHFTokenizer:
 
         self.is_loaded = True
 
-    def render_chat_prompt(self, user_prompt: str, repo_id: Optional[str] = None) -> str:
+    def prepare_multimodal_tokens(self, modality: str, count: int) -> List[int]:
+        """
+        Multimodal Vision/Audio token preparation support for Gemma 4
+        """
+        if modality == "image":
+            return [258880] * count
+        elif modality == "audio":
+            return [258881] * count
+        return []
+
+    def render_chat_prompt(self, messages: List[Dict[str, str]], repo_id: Optional[str] = None) -> str:
         """
         Renders exact Chat Template for the target model family:
-        - Gemma 4 (Google): <start_of_turn>user\n...<end_of_turn>\n<start_of_turn>model\n
-        - Xiaomi MiMo / Qwen: <|im_start|>user\n...<|im_end|>\n<|im_start|>assistant\n
+        - Gemma 4 (Google): <|tool_call>call:func{args}<tool_call|> and <|turn>model\n<|channel>thought...
+        - Xiaomi MiMo / Qwen: ChatML format <|im_start|>system...
         - DeepSeek: <｜User｜>...<｜Assistant｜>
         - Mistral: [INST] ... [/INST]
         - Kimi K3: XTML format
         """
         target_repo = (repo_id or self.repo_id).lower()
         
+        prompt = ""
+        
         if "gemma-4" in target_repo or "gemma4" in target_repo:
-            return f"<bos><|turn>user\n{user_prompt}<turn|>\n<|turn>model\n<|channel>thought\n<channel|>"
+            prompt += "<bos>"
+            for msg in messages:
+                role = msg["role"]
+                content = msg["content"]
+                if role == "system":
+                    prompt += f"<|turn>system\n{content}<turn|>\n"
+                elif role == "user":
+                    prompt += f"<|turn>user\n{content}<turn|>\n"
+                elif role == "assistant":
+                    prompt += f"<|turn>model\n{content}<turn|>\n"
+            prompt += "<|turn>model\n<|channel>thought\n"
+            return prompt
+            
         elif "gemma" in target_repo:
-            return f"<bos><start_of_turn>user\n{user_prompt}<end_of_turn>\n<start_of_turn>model\n"
+            prompt += "<bos>"
+            for msg in messages:
+                role = msg["role"]
+                content = msg["content"]
+                prompt += f"<start_of_turn>{role}\n{content}<end_of_turn>\n"
+            prompt += "<start_of_turn>model\n"
+            return prompt
+            
         elif "qwen" in target_repo or "mimo" in target_repo:
-            return f"<|im_start|>user\n{user_prompt}<|im_end|>\n<|im_start|>assistant\n"
+            for msg in messages:
+                role = msg["role"]
+                content = msg["content"]
+                prompt += f"<|im_start|>{role}\n{content}<|im_end|>\n"
+            prompt += "<|im_start|>assistant\n"
+            return prompt
+            
         elif "deepseek" in target_repo:
-            return f"<｜User｜>{user_prompt}<｜Assistant｜>"
+            for msg in messages:
+                role = msg["role"]
+                content = msg["content"]
+                if role == "user":
+                    prompt += f"<｜User｜>{content}"
+                elif role == "assistant":
+                    prompt += f"<｜Assistant｜>{content}"
+            prompt += "<｜Assistant｜>"
+            return prompt
+            
         elif "mixtral" in target_repo or "mistral" in target_repo:
-            return f"[INST] {user_prompt} [/INST]"
+            for msg in messages:
+                role = msg["role"]
+                content = msg["content"]
+                if role == "user":
+                    prompt += f"[INST] {content} [/INST]"
+                elif role == "assistant":
+                    prompt += f" {content} "
+            return prompt
+            
         else:
             # Default XTML format for Kimi-K3
-            return self.render_xtml_chat_prompt(user_prompt, thinking=False)
-
-    def render_xtml_chat_prompt(self, user_prompt: str, image_size: Optional[Tuple[int, int]] = None, thinking: bool = False) -> str:
-        user_msg = f"{OPEN_TOKEN}message role=\"user\"{SEP_TOKEN}{user_prompt}{CLOSE_TOKEN}message{SEP_TOKEN}{END_OF_MSG_TOKEN}\n"
-        if thinking:
-            assistant_gen = f"{OPEN_TOKEN}message role=\"assistant\"{SEP_TOKEN}{OPEN_TOKEN}think{SEP_TOKEN}"
-        else:
-            assistant_gen = f"{OPEN_TOKEN}message role=\"assistant\"{SEP_TOKEN}{OPEN_TOKEN}response{SEP_TOKEN}"
-        return user_msg + assistant_gen
+            for msg in messages:
+                role = msg["role"]
+                content = msg["content"]
+                prompt += f"{OPEN_TOKEN}message role=\"{role}\"{SEP_TOKEN}{content}{CLOSE_TOKEN}message{SEP_TOKEN}{END_OF_MSG_TOKEN}\n"
+            prompt += f"{OPEN_TOKEN}message role=\"assistant\"{SEP_TOKEN}{OPEN_TOKEN}thought{SEP_TOKEN}"
+            return prompt
 
     def encode(self, text: str) -> List[int]:
         if not text:

@@ -96,10 +96,6 @@ def main():
 
     print(f"\n✅ Modelo seleccionado: {selected_name} ({selected_repo})")
 
-    user_prompt = input("\nIngresa tu Prompt / Pregunta (por defecto: '¿Qué es la inteligencia artificial?'): ").strip()
-    if not user_prompt:
-        user_prompt = "¿Qué es la inteligencia artificial?"
-
     layers_raw = input("Número de capas a ejecutar (por defecto: 2 para celular / 4 para PC): ").strip()
     layers = int(layers_raw) if layers_raw.isdigit() else 2
 
@@ -136,26 +132,44 @@ def main():
         num_active_layers=layers,
     )
 
-    print(f"\n[3/3] Step 3: Ejecutando Inferencia Autoregresiva...")
-    print(f"Prompt: '{user_prompt}'")
+    print(f"\n[3/3] Step 3: Iniciando Chat Interactivo Agentic (escribe 'exit' o 'quit' para salir)")
     print("--------------------------------------------------------------------------------")
 
-    output_text = ""
-    for step, token_id, decoded_word, latency, total_bytes in engine.generate_chat_response_stream(user_prompt, num_tokens=tokens):
-        output_text += decoded_word + " "
-        mb_streamed = total_bytes / (1024 * 1024)
-        clean_word = repr(decoded_word)[1:-1]
-        print(f"Token [{step}/{tokens}] -> Word: '{clean_word}' (ID: {token_id}) | Latency: {latency * 1000:.2f} ms | Streamed: {mb_streamed:.2f} MB")
+    from .tokenizer import UniversalHFTokenizer
+    tokenizer = UniversalHFTokenizer(repo_id=selected_repo)
+    
+    chat_history = []
 
-    print("\n================================================================================")
-    print(" RESPONSE GENERATED (100% Zero-Disk Streamed)")
-    print("================================================================================")
-    print(f"Full Text: {output_text.strip()}")
-    print("--------------------------------------------------------------------------------")
-    print(f" HTTP Range Requests Sent   : {engine.total_range_requests}")
-    print(f" Total Data Streamed        : {engine.total_bytes_streamed / (1024*1024):.2f} MB")
-    print(f" Local SSD Storage Used     : 0 Bytes (100% Zero-Disk RAM Ingest)")
-    print("================================================================================")
+    while True:
+        try:
+            user_prompt = input("\n[Tú]: ").strip()
+        except EOFError:
+            break
+            
+        if user_prompt.lower() in ["exit", "quit"]:
+            break
+        if not user_prompt:
+            continue
+            
+        chat_history.append({"role": "user", "content": user_prompt})
+        
+        full_prompt = tokenizer.render_chat_prompt(chat_history, repo_id=selected_repo)
+
+        print("[Agentic Mode]: ", end="", flush=True)
+        output_text = ""
+        
+        # Generación streaming fluida
+        for step, token_id, decoded_word, latency, total_bytes in engine.generate_chat_response_stream(full_prompt, num_tokens=tokens):
+            print(decoded_word, end="", flush=True)
+            output_text += decoded_word
+
+        print("\n")
+        chat_history.append({"role": "assistant", "content": output_text.strip()})
+
+        print("--------------------------------------------------------------------------------")
+        print(f" HTTP Range Requests Sent   : {engine.total_range_requests}")
+        print(f" Total Data Streamed        : {engine.total_bytes_streamed / (1024*1024):.2f} MB")
+        print("--------------------------------------------------------------------------------")
 
 if __name__ == "__main__":
     main()

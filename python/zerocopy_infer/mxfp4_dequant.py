@@ -33,21 +33,20 @@ def dequantize_mxfp4(weight_packed: np.ndarray, weight_scale: np.ndarray, block_
     if weight_packed.dtype != np.uint8:
         weight_packed = weight_packed.view(np.uint8)
         
-    low_nibble = weight_packed & 0x0F
-    high_nibble = (weight_packed >> 4) & 0x0F
+    shape_N, half_K = weight_packed.shape
     
-    # Interleave low and high nibbles: (N, K // 2, 2) -> (N, K)
-    shape_N = weight_packed.shape[0]
-    fp4_indices = np.stack([low_nibble, high_nibble], axis=-1).reshape(shape_N, -1)
+    fp4_indices = np.empty((shape_N, half_K * 2), dtype=np.uint8)
+    fp4_indices[:, 0::2] = weight_packed & 0x0F
+    fp4_indices[:, 1::2] = weight_packed >> 4
     
     # Map 4-bit indices to E2M1 float values
     unscaled_weights = FP4_E2M1_TABLE[fp4_indices]
     
-    # Compute E8M0 exponent multipliers: 2^(scale - 127)
-    scale_floats = weight_scale.astype(np.float32)
-    scales = np.power(2.0, scale_floats - 127.0)
+    # Compute E8M0 exponent multipliers: 2^(scale - 127) via fast ldexp
+    scales = np.ldexp(1.0, weight_scale.astype(np.int32) - 127).astype(np.float32)
     
-    # Repeat scale across 32 elements along the K dimension
-    scale_expanded = np.repeat(scales, block_size, axis=-1)[:, :unscaled_weights.shape[1]]
+    # Broadcast scale across block_size elements along the K dimension
+    scales = scales[:, :, np.newaxis]
+    unscaled_weights = unscaled_weights.reshape(shape_N, -1, block_size)
     
-    return unscaled_weights * scale_expanded
+    return (unscaled_weights * scales).reshape(shape_N, -1)
