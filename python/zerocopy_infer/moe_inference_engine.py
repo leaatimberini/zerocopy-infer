@@ -189,7 +189,7 @@ class ZeroCopyMoEEngine:
     def total_range_requests(self) -> int:
         return self.streamer.total_range_requests
 
-    def fetch_weight_tensor(self, tensor_name: str, fallback_shape: Tuple[int, ...]) -> Optional[np.ndarray]:
+    def fetch_weight_tensor(self, tensor_name: str, fallback_shape: Optional[Tuple[int, ...]] = None) -> Optional[np.ndarray]:
         """
         Stream exact weight slice over HTTP Range Request directly into RAM.
         Returns None if tensor is not present in indexed shards (enabling fast skip).
@@ -204,36 +204,26 @@ class ZeroCopyMoEEngine:
         if meta is None:
             return None
 
-        # Self-healing: Retry logic for network timeouts
+        # Fetch tensor from remote safetensors over HTTP Range Request
         for attempt in range(3):
             try:
                 arr = self.streamer.fetch_tensor(tensor_name)
-                # Self-healing: Shape mismatch check
-                if arr.shape != fallback_shape:
-                    if np.prod(arr.shape) == np.prod(fallback_shape):
-                        arr = arr.reshape(fallback_shape)
-                    else:
-                        print(f" [Self-Healing] Shape mismatch for {tensor_name}: {arr.shape} != {fallback_shape}")
-                        return np.zeros(fallback_shape, dtype=np.float32)
-
-                arr_bytes = arr.nbytes
-                
-                with self.cache_lock:
-                    while self.current_cache_bytes + arr_bytes > self.max_cache_bytes and self.tensor_lru_cache:
-                        k, evicted_arr = self.tensor_lru_cache.popitem(last=False)
-                        self.current_cache_bytes -= evicted_arr.nbytes
-                        del evicted_arr
-                        gc.collect()
-                        
-                    self.tensor_lru_cache[tensor_name] = arr
-                    self.current_cache_bytes += arr_bytes
-                return arr
-            except Exception as e:
-                if attempt == 2:
-                    print(f" [Self-Healing] Failed to fetch {tensor_name} after 3 retries: {e}. Using zeroed fallback.")
-                    return np.zeros(fallback_shape, dtype=np.float32)
-                time.sleep(0.5)
-        return np.zeros(fallback_shape, dtype=np.float32)
+                if arr is not None:
+                    arr_bytes = arr.nbytes
+                    with self.cache_lock:
+                        while self.current_cache_bytes + arr_bytes > self.max_cache_bytes and self.tensor_lru_cache:
+                            k, evicted_arr = self.tensor_lru_cache.popitem(last=False)
+                            self.current_cache_bytes -= evicted_arr.nbytes
+                            del evicted_arr
+                            gc.collect()
+                            
+                        self.tensor_lru_cache[tensor_name] = arr
+                        self.current_cache_bytes += arr_bytes
+                    return arr
+            except Exception:
+                if attempt < 2:
+                    time.sleep(0.2)
+        return None
 
     def fetch_mxfp4_weight_tensor(self, base_name: str, fallback_shape: Tuple[int, ...]) -> Optional[np.ndarray]:
         """
