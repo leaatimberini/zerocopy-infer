@@ -9,9 +9,15 @@ HTTP Range request transfer rate (MB/s), and real-time token latency gauges.
 
 import time
 import os
+import sys
 from typing import Dict, Any
 
-from python.zerocopy_infer.hardware_detector import detect_hardware
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "python")))
+
+try:
+    from zerocopy_infer.hardware_detector import detect_hardware
+except ImportError:
+    from python.zerocopy_infer.hardware_detector import detect_hardware
 
 
 def render_telemetry_dashboard():

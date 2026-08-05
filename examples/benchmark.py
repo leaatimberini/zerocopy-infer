@@ -9,12 +9,21 @@ RAM limits, and model choices to measure tokens/sec, latencies, and HTTP streami
 
 import time
 import json
+import os
+import sys
 import numpy as np
 from typing import Dict, Any, List
 
-from python.zerocopy_infer.hardware_detector import detect_hardware
-from python.zerocopy_infer.hf_range_stream import SafetensorsRangeStreamer
-from python.zerocopy_infer.moe_inference_engine import ZeroCopyMoEEngine
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "python")))
+
+try:
+    from zerocopy_infer.hardware_detector import detect_hardware
+    from zerocopy_infer.hf_range_stream import SafetensorsRangeStreamer
+    from zerocopy_infer.moe_inference_engine import ZeroCopyMoEEngine
+except ImportError:
+    from python.zerocopy_infer.hardware_detector import detect_hardware
+    from python.zerocopy_infer.hf_range_stream import SafetensorsRangeStreamer
+    from python.zerocopy_infer.moe_inference_engine import ZeroCopyMoEEngine
 
 
 def run_benchmark(model_repo: str = "Qwen/Qwen2.5-1.5B-Instruct", test_layers: List[int] = [1, 2, 4], num_tokens: int = 5) -> Dict[str, Any]:

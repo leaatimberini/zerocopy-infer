@@ -1,0 +1,13 @@
+{
+  "hardware": {
+    "arch": "amd64",
+    "system": "Windows",
+    "cpu_count": 12,
+    "simd_extension": "AVX2",
+    "ram_available_gb": 10.562714385986327,
+    "ram_total_gb": 15.089591979980469
+  },
+  "recommended_model": "google/gemma-4-26B-A4B-it",
+  "recommended_layers": 8,
+  "recommended_cache_gb": 6.0
+}

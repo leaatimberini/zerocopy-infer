@@ -6,22 +6,39 @@ and tokenizer prompt templates.
 """
 
 import sys
+import os
 import unittest
 import numpy as np
 from typing import Dict, Any
 
-from python.zerocopy_infer.hardware_detector import detect_hardware, HardwareDetector
-from python.zerocopy_infer.optimized_kernels import dispatch_matmul, dispatch_mxfp4_dequant
-from python.zerocopy_infer.model_architectures import (
-    get_architecture_handler,
-    Gemma4ArchitectureHandler,
-    KimiK3ArchitectureHandler,
-    XiaomiMiMoArchitectureHandler,
-    DeepSeekV3ArchitectureHandler,
-    Qwen25ArchitectureHandler,
-    MixtralArchitectureHandler,
-)
-from python.zerocopy_infer.tokenizer import UniversalHFTokenizer
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "python")))
+
+try:
+    from zerocopy_infer.hardware_detector import detect_hardware, HardwareDetector
+    from zerocopy_infer.optimized_kernels import dispatch_matmul, dispatch_mxfp4_dequant
+    from zerocopy_infer.model_architectures import (
+        get_architecture_handler,
+        Gemma4ArchitectureHandler,
+        KimiK3ArchitectureHandler,
+        XiaomiMiMoArchitectureHandler,
+        DeepSeekV3ArchitectureHandler,
+        Qwen25ArchitectureHandler,
+        MixtralArchitectureHandler,
+    )
+    from zerocopy_infer.tokenizer import UniversalHFTokenizer
+except ImportError:
+    from python.zerocopy_infer.hardware_detector import detect_hardware, HardwareDetector
+    from python.zerocopy_infer.optimized_kernels import dispatch_matmul, dispatch_mxfp4_dequant
+    from python.zerocopy_infer.model_architectures import (
+        get_architecture_handler,
+        Gemma4ArchitectureHandler,
+        KimiK3ArchitectureHandler,
+        XiaomiMiMoArchitectureHandler,
+        DeepSeekV3ArchitectureHandler,
+        Qwen25ArchitectureHandler,
+        MixtralArchitectureHandler,
+    )
+    from python.zerocopy_infer.tokenizer import UniversalHFTokenizer
 
 
 class TestHardwareDetector(unittest.TestCase):

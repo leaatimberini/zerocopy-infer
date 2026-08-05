@@ -11,10 +11,18 @@ import json
 import time
 import http.server
 import socketserver
+import os
+import sys
 from urllib.parse import parse_qs, urlparse
 
-from python.zerocopy_infer.hardware_detector import detect_hardware
-from python.zerocopy_infer.tokenizer import UniversalHFTokenizer
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "python")))
+
+try:
+    from zerocopy_infer.hardware_detector import detect_hardware
+    from zerocopy_infer.tokenizer import UniversalHFTokenizer
+except ImportError:
+    from python.zerocopy_infer.hardware_detector import detect_hardware
+    from python.zerocopy_infer.tokenizer import UniversalHFTokenizer
 
 PORT = 8080
 

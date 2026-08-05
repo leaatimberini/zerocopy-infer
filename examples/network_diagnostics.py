@@ -9,9 +9,16 @@ streaming bandwidth throughput (MB/s) against HF CDN edge endpoints.
 
 import time
 import json
+import os
+import sys
 from typing import Dict, Any
 
-from python.zerocopy_infer.hf_range_stream import HFRangeClient
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "python")))
+
+try:
+    from zerocopy_infer.hf_range_stream import HFRangeClient
+except ImportError:
+    from python.zerocopy_infer.hf_range_stream import HFRangeClient
 
 
 def run_network_diagnostics(repo_id: str = "google/gemma-4-26B-A4B-it") -> Dict[str, Any]:

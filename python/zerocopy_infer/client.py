@@ -7,11 +7,18 @@ Provides a simple, elegant Python SDK for developers to run ZeroCopy-Infer
 in Python scripts, Jupyter notebooks, or backend services with minimal setup.
 """
 
+import os
+import sys
 from typing import Dict, Any, Optional, Generator, List, Callable
 
-from python.zerocopy_infer.hf_range_stream import SafetensorsRangeStreamer
-from python.zerocopy_infer.moe_inference_engine import ZeroCopyMoEEngine
-from python.zerocopy_infer.hardware_detector import detect_hardware
+try:
+    from .hf_range_stream import SafetensorsRangeStreamer
+    from .moe_inference_engine import ZeroCopyMoEEngine
+    from .hardware_detector import detect_hardware
+except ImportError:
+    from zerocopy_infer.hf_range_stream import SafetensorsRangeStreamer
+    from zerocopy_infer.moe_inference_engine import ZeroCopyMoEEngine
+    from zerocopy_infer.hardware_detector import detect_hardware
 
 
 class ZeroCopyClient:

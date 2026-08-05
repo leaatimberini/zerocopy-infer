@@ -8,16 +8,29 @@ up-to-date Markdown technical specification document (ARCHITECTURE_SPECS.md).
 """
 
 import os
+import sys
 from typing import Dict, Any
 
-from python.zerocopy_infer.model_architectures import (
-    Gemma4ArchitectureHandler,
-    KimiK3ArchitectureHandler,
-    XiaomiMiMoArchitectureHandler,
-    DeepSeekV3ArchitectureHandler,
-    Qwen25ArchitectureHandler,
-    MixtralArchitectureHandler,
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "python")))
+
+try:
+    from zerocopy_infer.model_architectures import (
+        Gemma4ArchitectureHandler,
+        KimiK3ArchitectureHandler,
+        XiaomiMiMoArchitectureHandler,
+        DeepSeekV3ArchitectureHandler,
+        Qwen25ArchitectureHandler,
+        MixtralArchitectureHandler,
+    )
+except ImportError:
+    from python.zerocopy_infer.model_architectures import (
+        Gemma4ArchitectureHandler,
+        KimiK3ArchitectureHandler,
+        XiaomiMiMoArchitectureHandler,
+        DeepSeekV3ArchitectureHandler,
+        Qwen25ArchitectureHandler,
+        MixtralArchitectureHandler,
+    )
 
 
 def generate_architecture_specs_markdown() -> str:

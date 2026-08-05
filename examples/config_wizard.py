@@ -9,15 +9,20 @@ an optimal zero-disk streaming configuration profile.
 
 import json
 import os
-from typing import Dict, Any
+import sys
 
-from python.zerocopy_infer.hardware_detector import detect_hardware
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "python")))
+
+try:
+    from zerocopy_infer.hardware_detector import detect_hardware
+except ImportError:
+    from python.zerocopy_infer.hardware_detector import detect_hardware
 
 
 def run_config_wizard() -> Dict[str, Any]:
     hw = detect_hardware()
     print("=" * 80)
-    print(" 🧙 ZeroCopy-Infer: Hardware Auto-Tuning Configuration Wizard")
+    print(" [ZeroCopy-Infer] Hardware Auto-Tuning Configuration Wizard")
     print("=" * 80)
     print(f" OS / Arch: {hw['system']} ({hw['arch']})")
     print(f" CPU Cores: {hw['cpu_count']}")
@@ -44,10 +49,10 @@ def run_config_wizard() -> Dict[str, Any]:
         rec_layers = 16
         rec_cache = 12.0
 
-    print("\n💡 RECOMENDACIÓN AUTOMÁTICA SEGÚN TU HARDWARE:")
-    print(f"  • Modelo Recomendado: {rec_model}")
-    print(f"  • Capas Activas Recomendadas: {rec_layers}")
-    print(f"  • Límite de Caché RAM: {rec_cache} GB")
+    print("\n RECOMENDACIÓN AUTOMÁTICA SEGÚN TU HARDWARE:")
+    print(f"  * Modelo Recomendado: {rec_model}")
+    print(f"  * Capas Activas Recomendadas: {rec_layers}")
+    print(f"  * Límite de Caché RAM: {rec_cache} GB")
     print("=" * 80)
 
     profile = {
@@ -59,9 +64,9 @@ def run_config_wizard() -> Dict[str, Any]:
 
     out_path = "config_preset.json"
     with open(out_path, "w", encoding="utf-8") as f:
-        json.dumps(profile, indent=2)
+        json.dump(profile, f, indent=2)
 
-    print(f"✅ Perfil guardado en '{out_path}'.")
+    print(f"[ZeroCopy-Infer] Perfil guardado en '{out_path}'.")
     return profile
 
 

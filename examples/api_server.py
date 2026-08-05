@@ -11,9 +11,16 @@ import json
 import time
 import http.server
 import socketserver
+import os
+import sys
 from urllib.parse import urlparse
 
-from python.zerocopy_infer.hardware_detector import detect_hardware
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "python")))
+
+try:
+    from zerocopy_infer.hardware_detector import detect_hardware
+except ImportError:
+    from python.zerocopy_infer.hardware_detector import detect_hardware
 
 PORT = 8000
 
