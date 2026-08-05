@@ -225,6 +225,29 @@ class ZeroCopyMoEEngine:
                 
         return self.fetch_weight_tensor(base_name, fallback_shape)
 
+    def _prefetch_layer_weights(self, layer_idx: int):
+        """
+        Asynchronously prefetches non-routed weights for the given layer into RAM.
+        """
+        q_name = f"model.layers.{layer_idx}.self_attn.q_proj.weight"
+        k_name = f"model.layers.{layer_idx}.self_attn.k_proj.weight"
+        v_name = f"model.layers.{layer_idx}.self_attn.v_proj.weight"
+        out_name = f"model.layers.{layer_idx}.self_attn.o_proj.weight"
+        norm1 = f"model.layers.{layer_idx}.input_layernorm.weight"
+        norm2 = f"model.layers.{layer_idx}.post_attention_layernorm.weight"
+        gate = f"model.layers.{layer_idx}.block_sparse_moe.gate.weight"
+        
+        for name in (norm1, norm2, q_name, k_name, v_name, out_name, gate):
+            if self.streamer.ensure_tensor_header(name):
+                self.fetch_weight_tensor(name, (self.hidden_dim,))
+        
+        for shared_idx in range(self.config.num_shared_experts):
+            sw1_name = f"model.layers.{layer_idx}.block_sparse_moe.shared_experts.{shared_idx}.w1.weight"
+            sw2_name = f"model.layers.{layer_idx}.block_sparse_moe.shared_experts.{shared_idx}.w2.weight"
+            if self.streamer.ensure_tensor_header(sw1_name):
+                self.fetch_weight_tensor(sw1_name, (self.moe_inter, self.hidden_dim))
+            if self.streamer.ensure_tensor_header(sw2_name):
+                self.fetch_weight_tensor(sw2_name, (self.hidden_dim, self.moe_inter))
     def rms_norm(self, x: np.ndarray, weight: Optional[np.ndarray]) -> np.ndarray:
         """
         RMSNorm with eps = 1e-05. Handles None weight gracefully.
