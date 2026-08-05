@@ -487,16 +487,12 @@ class ZeroCopyMoEEngine:
             generated_token_ids.append(sampled_token_id)
             assistant_reply += decoded_word
             
-            # Autoregressive: next input is the embedding of the sampled token
-            if sampled_token_id in active_ranks:
-                vocab_idx = active_ranks.index(sampled_token_id)
-                hidden_states = W_vocab[vocab_idx].copy()
-            else:
-                try:
-                    embeds = self.streamer.fetch_token_embedding_vectors([sampled_token_id], self.hidden_dim)
-                    hidden_states = embeds[0].copy()
-                except Exception:
-                    hidden_states = W_vocab[best_idx % len(W_vocab)].copy()
+            # Autoregressive state transition: fetch token embedding for next step
+            try:
+                embeds = self.streamer.fetch_token_embedding_vectors([sampled_token_id], self.hidden_dim)
+                hidden_states = embeds[0].copy()
+            except Exception:
+                pass
             
             gc.collect()
             
