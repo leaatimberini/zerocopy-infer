@@ -209,5 +209,16 @@ class TestExportSpecs(unittest.TestCase):
         self.assertIn("hardware", specs)
 
 
+class TestVocabIndexCache(unittest.TestCase):
+    def test_vocab_cache(self):
+        from zerocopy_infer.vocab_cache import VocabIndexCache
+        cache = VocabIndexCache()
+        vocab = {"hola": 10, "mundo": 20, "123": 30}
+        ranks = cache.get_latin_word_ranks(vocab)
+        self.assertIn(10, ranks)
+        self.assertIn(20, ranks)
+        self.assertNotIn(30, ranks)
+
+
 if __name__ == "__main__":
     unittest.main()
