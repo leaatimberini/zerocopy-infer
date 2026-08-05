@@ -472,13 +472,16 @@ class ZeroCopyMoEEngine:
         return hidden_states + moe_output
 
     def generate_chat_response_stream(
-        self, user_prompt: str, num_tokens: int = 12
+        self, user_prompt: Union[str, List[Dict[str, str]]], num_tokens: int = 12
     ) -> Generator[Tuple[int, int, str, float, int], None, None]:
         """
-        Executes Official Kimi-K3 Real Safetensors Forward-Pass Stream with XTML Prompt Formatting.
+        Executes Real Safetensors Forward-Pass Stream with Chat Template Formatting.
         """
-        # Format user prompt dynamically for target model (Gemma, MiMo, Kimi, DeepSeek, Qwen, Mixtral)
-        chat_prompt = self.tokenizer.render_chat_prompt(user_prompt, self.streamer.repo_id)
+        if isinstance(user_prompt, str) and (user_prompt.startswith("<") or "[" in user_prompt or "<|im_start|>" in user_prompt):
+            chat_prompt = user_prompt
+        else:
+            chat_prompt = self.tokenizer.render_chat_prompt(user_prompt, self.streamer.repo_id)
+            
         input_token_ids = self.tokenizer.encode(chat_prompt)
         if not input_token_ids:
             input_token_ids = [self.config.bos_token_id, 1000]

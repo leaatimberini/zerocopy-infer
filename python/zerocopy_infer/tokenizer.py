@@ -170,17 +170,15 @@ class UniversalHFTokenizer:
             return [258881] * count
         return []
 
-    def render_chat_prompt(self, messages: List[Dict[str, str]], repo_id: Optional[str] = None) -> str:
+    def render_chat_prompt(self, messages: Union[List[Dict[str, str]], str], repo_id: Optional[str] = None) -> str:
         """
-        Renders exact Chat Template for the target model family:
-        - Gemma 4 (Google): <|tool_call>call:func{args}<tool_call|> and <|turn>model\n<|channel>thought...
-        - Xiaomi MiMo / Qwen: ChatML format <|im_start|>system...
-        - DeepSeek: <｜User｜>...<｜Assistant｜>
-        - Mistral: [INST] ... [/INST]
-        - Kimi K3: XTML format
+        Renders exact Chat Template for the target model family.
+        Accepts either a list of message dicts or a raw string prompt.
         """
+        if isinstance(messages, str):
+            messages = [{"role": "user", "content": messages}]
+
         target_repo = (repo_id or self.repo_id).lower()
-        
         prompt = ""
         
         if "gemma-4" in target_repo or "gemma4" in target_repo:
