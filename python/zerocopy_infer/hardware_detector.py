@@ -90,6 +90,19 @@ class HardwareDetector:
             "total_swap": total_swap
         }
 
+def detect_hardware():
+    info = HardwareDetector.detect()
+    simd_str = ", ".join(info["simd"]) if info["simd"] else "Standard"
+    ram_gb = info["total_ram"] / (1024**3) if info["total_ram"] > 0 else 4.0
+    return {
+        "arch": info["architecture"],
+        "system": info["os"],
+        "cpu_count": info["cpu_cores"],
+        "simd_extension": simd_str,
+        "ram_available_gb": max(1.0, ram_gb * 0.7),
+        "ram_total_gb": ram_gb,
+    }
+
 if __name__ == "__main__":
     hw_info = HardwareDetector.detect()
     print("Detected Hardware:")
