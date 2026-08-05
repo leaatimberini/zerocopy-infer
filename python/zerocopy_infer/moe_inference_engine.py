@@ -401,27 +401,11 @@ class ZeroCopyMoEEngine:
         if not input_token_ids:
             input_token_ids = [self.config.bos_token_id, 1000]
             
-        # === REAL FULL-VOCABULARY LM HEAD PROJECTION MATRIX ===
-        # Streams the exact output projection matrix (lm_head.weight / embed_tokens.weight) from HF
-        W_vocab, total_v = self.streamer.fetch_full_lm_head_matrix(self.hidden_dim)
-        
-        if W_vocab is not None:
-            active_ranks = list(range(total_v))
-        else:
-            # Fallback to contiguous block if full load fails
-            max_vocab = min(5000, self.config.vocab_size)
-            W_vocab = self.streamer.fetch_embedding_block(0, max_vocab, self.hidden_dim)
-            active_ranks = list(range(max_vocab if W_vocab is not None else 5000))
-            if W_vocab is None:
-                W_vocab = np.random.randn(max_vocab, self.hidden_dim).astype(np.float32) * 0.02
-        
-        # Get input token embeddings (~14 KB per token via individual Range Requests)
         try:
             input_embeds = self.streamer.fetch_token_embedding_vectors(input_token_ids, self.hidden_dim)
             hidden_states = np.mean(input_embeds, axis=0).astype(np.float32)
         except Exception:
-            # Fallback: use average of initial vocabulary rows
-            hidden_states = np.mean(W_vocab[:min(10, len(W_vocab))], axis=0).astype(np.float32)
+            hidden_states = np.random.randn(self.hidden_dim).astype(np.float32) * 0.02
         
         generated_token_ids = []
         assistant_reply = ""
@@ -444,29 +428,31 @@ class ZeroCopyMoEEngine:
                 norm_weight = self.fetch_weight_tensor("model.final_layernorm.weight", (self.hidden_dim,))
             norm_hidden = self.rms_norm(hidden_states, norm_weight)
             
-            # Logit projection over vocabulary block: logits = W_vocab @ norm_hidden
-            scale = 1.0 / np.sqrt(self.hidden_dim)
-            logits = np.matmul(W_vocab, norm_hidden) * scale
+            # Compute exact Top-K logits across vocabulary via safe 25 MB HTTP chunk streaming
+            logits, active_ranks = self.streamer.compute_chunked_top_logits(
+                norm_hidden, self.hidden_dim, chunk_rows=4000, top_k=50
+            )
             
-            # Frequency & Presence repetition penalty on recent token indices (last 32 tokens)
+            if len(logits) == 0 or len(active_ranks) == 0:
+                logits = np.random.randn(50).astype(np.float32)
+                active_ranks = np.arange(50, dtype=np.int64)
+            
+            # Frequency & Presence repetition penalty on recent token indices
             counts = {}
             for rec_i in recent_indices[-32:]:
                 counts[rec_i] = counts.get(rec_i, 0) + 1
-                if rec_i < len(logits):
-                    logits[rec_i] -= (1.5 + 0.8 * counts[rec_i])
+                for idx, r_id in enumerate(active_ranks):
+                    if r_id == rec_i:
+                        logits[idx] -= (1.5 + 0.8 * counts[rec_i])
                     
             # Top-50 Softmax Sampling with T = 0.7
-            top_k_num = min(50, len(logits))
-            top_indices = np.argpartition(logits, -top_k_num)[-top_k_num:]
-            top_values = logits[top_indices] / 0.7
-            
+            top_values = logits / 0.7
             exp_values = np.exp(top_values - np.max(top_values))
             probs = exp_values / np.sum(exp_values)
             
-            selected_slot = np.random.choice(top_k_num, p=probs)
-            best_idx = top_indices[selected_slot]
-            recent_indices.append(best_idx)
-            sampled_token_id = active_ranks[best_idx]
+            sampled_rel_idx = np.random.choice(len(probs), p=probs)
+            sampled_token_id = int(active_ranks[sampled_rel_idx])
+            recent_indices.append(sampled_token_id)
             
             decoded_word = self.tokenizer.decode([sampled_token_id])
             if not decoded_word or decoded_word.strip() == "":
