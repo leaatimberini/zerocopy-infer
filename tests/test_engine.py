@@ -139,5 +139,11 @@ class TestMemoryPressureGuard(unittest.TestCase):
         self.assertEqual(bytes_purged, 1024)
 
 
+class TestOpenAIApiServer(unittest.TestCase):
+    def test_api_server_import(self):
+        from examples.api_server import OpenAIApiHandler
+        self.assertIsNotNone(OpenAIApiHandler)
+
+
 if __name__ == "__main__":
     unittest.main()
