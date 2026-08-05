@@ -18,7 +18,7 @@ import gc
 import time
 import json
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Generator, Any
+from typing import Dict, List, Optional, Tuple, Generator, Any, Union
 from collections import OrderedDict
 import threading
 import concurrent.futures
