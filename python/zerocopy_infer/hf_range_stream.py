@@ -121,6 +121,7 @@ class SafetensorsRangeStreamer:
         if shard_filename in self.parsed_shards:
             return True
             
+        print(f"[ZeroCopy-Infer] Lazy-loading header for shard: {shard_filename}...")
         shard_url = f"{self.base_url}/{shard_filename}"
         try:
             header_size_bytes = self.client.fetch_range(shard_url, 0, 7)
@@ -148,10 +149,10 @@ class SafetensorsRangeStreamer:
                 }
                 self.tensor_map[tensor_name] = entry
                 
-                if tensor_name.startswith("language_model.model."):
-                    self.tensor_map[tensor_name.replace("language_model.", "")] = entry
-                elif tensor_name.startswith("language_model."):
-                    self.tensor_map[tensor_name.replace("language_model.", "")] = entry
+                clean_name = tensor_name.replace("language_model.", "").replace("model.", "")
+                self.tensor_map[clean_name] = entry
+                self.tensor_map[f"model.{clean_name}"] = entry
+                self.tensor_map[f"language_model.model.{clean_name}"] = entry
 
             self.parsed_shards.add(shard_filename)
             return True
@@ -238,17 +239,19 @@ class SafetensorsRangeStreamer:
             "language_model.model.embed_tokens.weight",
             "embed_tokens.weight",
         ]
+        # 1. Check if already parsed in tensor_map
         for key in candidates:
             if key in self.tensor_map:
                 return self.tensor_map[key]
-                
+
+        # 2. Lazy load shard header from shard_index if not yet parsed
+        for key in candidates:
             shard_file = self.shard_index.get(key)
             if shard_file:
-                print(f"[ZeroCopy-Infer] Lazy-loading header for {shard_file} ({key})...")
-                if self.parse_shard_header(shard_file):
-                    for sub_key in candidates:
-                        if sub_key in self.tensor_map:
-                            return self.tensor_map[sub_key]
+                self.parse_shard_header(shard_file)
+                for check_key in candidates:
+                    if check_key in self.tensor_map:
+                        return self.tensor_map[check_key]
         return None
 
     def fetch_full_lm_head_matrix(self, hidden_dim: int = 7168, max_rows: Optional[int] = None) -> Tuple[Optional[np.ndarray], int]:
