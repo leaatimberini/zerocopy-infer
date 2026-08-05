@@ -168,7 +168,8 @@ class ZeroCopyMoEEngine:
             self.num_active_layers = self.config.num_hidden_layers
         self.tokenizer = ZeroCopyKimiTokenizer(repo_id=streamer.repo_id)
         from .model_architectures import get_architecture_handler
-        self.arch_handler = get_architecture_handler(streamer.repo_id, streamer.remote_config)
+        remote_cfg = getattr(streamer, "remote_config", None) or streamer.fetch_remote_config()
+        self.arch_handler = get_architecture_handler(streamer.repo_id, remote_cfg)
         
         # LRU cache for streamed tensor weights in RAM
         self.max_cache_bytes = int(ram_cache_gb * 1024 * 1024 * 1024)

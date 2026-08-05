@@ -69,15 +69,20 @@ class SafetensorsRangeStreamer:
         """
         Fetches remote config.json directly from Hugging Face repository into RAM.
         """
+        if hasattr(self, "remote_config") and self.remote_config:
+            return self.remote_config
+
         config_url = f"{self.base_url}/config.json"
         try:
             req = urllib.request.Request(config_url, headers=self.client.headers)
             with urllib.request.urlopen(req, timeout=10.0) as resp:
                 cfg = json.loads(resp.read().decode("utf-8"))
                 print(f"[ZeroCopy-Infer] Remote config.json loaded for '{self.repo_id}': model_type={cfg.get('model_type', 'unknown')}")
+                self.remote_config = cfg
                 return cfg
         except Exception as e:
             print(f"[ZeroCopy-Infer] Notice fetching config.json ({e}). Using default parameters.")
+            self.remote_config = {}
             return {}
 
     def load_index_json(self) -> bool:
