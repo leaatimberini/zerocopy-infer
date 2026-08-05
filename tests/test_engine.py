@@ -120,5 +120,11 @@ class TestBenchmark(unittest.TestCase):
         self.assertIsNotNone(run_benchmark)
 
 
+class TestConfigWizard(unittest.TestCase):
+    def test_config_wizard_import(self):
+        from examples.config_wizard import run_config_wizard
+        self.assertIsNotNone(run_config_wizard)
+
+
 if __name__ == "__main__":
     unittest.main()
