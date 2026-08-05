@@ -165,5 +165,11 @@ class TestGenerateDocs(unittest.TestCase):
         self.assertTrue("Kimi K3" in doc)
 
 
+class TestNetworkDiagnostics(unittest.TestCase):
+    def test_network_diagnostics_import(self):
+        from examples.network_diagnostics import run_network_diagnostics
+        self.assertIsNotNone(run_network_diagnostics)
+
+
 if __name__ == "__main__":
     unittest.main()
