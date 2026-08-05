@@ -11,6 +11,8 @@ from typing import Dict
 
 from .hf_range_stream import SafetensorsRangeStreamer
 from .moe_inference_engine import ZeroCopyMoEEngine, KimiK3Config
+import platform
+import time
 
 PRESET_MODELS: Dict[int, Dict[str, str]] = {
     1: {
@@ -108,9 +110,17 @@ def main():
     tokens_raw = input("Número de tokens a generar (por defecto: 5): ").strip()
     tokens = int(tokens_raw) if tokens_raw.isdigit() else 5
 
+    from .hardware_detector import detect_hardware
+    hw = detect_hardware()
+
     print("\n--------------------------------------------------------------------------------")
     print(f"🚀 Iniciando Streaming Inferencia Zero-Disk en {selected_repo}...")
-    print(f" Capas activas: {layers} | Cache RAM: {cache_gb} GB | Tokens: {tokens}")
+    
+    print("\n\033[96m[Hardware Status Dashboard]\033[0m")
+    print(f" 💻 Architecture: {hw['arch']} | CPU Cores: {hw['cpu_count']} ({hw['system']})")
+    print(f" ⚡ SIMD Acceleration: {hw['simd_extension']}")
+    print(f" 💾 Available RAM: {hw['ram_available_gb']:.2f} GB / Total: {hw['ram_total_gb']:.2f} GB (Cache Limit: {cache_gb} GB)")
+    print(f" 📚 Active Layers: {layers}")
     print("--------------------------------------------------------------------------------\n")
 
     streamer = SafetensorsRangeStreamer(repo_id=selected_repo, shards=[])
@@ -142,7 +152,7 @@ def main():
 
     while True:
         try:
-            user_prompt = input("\n[Tú]: ").strip()
+            user_prompt = input("\n\033[94m[Tú]\033[0m: ").strip()
         except EOFError:
             break
             
@@ -155,21 +165,35 @@ def main():
         
         full_prompt = tokenizer.render_chat_prompt(chat_history, repo_id=selected_repo)
 
-        print("[Agentic Mode]: ", end="", flush=True)
+        print("\033[95m[ZeroCopy Agent]\033[0m: ", end="", flush=True)
         output_text = ""
         
-        # Generación streaming fluida
-        for step, token_id, decoded_word, latency, total_bytes in engine.generate_chat_response_stream(full_prompt, num_tokens=tokens):
-            print(decoded_word, end="", flush=True)
-            output_text += decoded_word
+        start_time = time.time()
+        tokens_gen = 0
+        total_latency = 0.0
+        
+        # Generación streaming fluida con self-healing
+        try:
+            for step, token_id, decoded_word, latency, total_bytes in engine.generate_chat_response_stream(full_prompt, num_tokens=tokens):
+                print(f"\033[92m{decoded_word}\033[0m", end="", flush=True)
+                output_text += decoded_word
+                tokens_gen += 1
+                total_latency += latency
+        except Exception as e:
+            print(f"\n\033[93m[Self-Healing] Recovered from generation error: {e}\033[0m")
+
+        end_time = time.time()
+        elapsed = end_time - start_time
+        tps = tokens_gen / elapsed if elapsed > 0 else 0
+        avg_lat = (total_latency / tokens_gen * 1000) if tokens_gen > 0 else 0
 
         print("\n")
         chat_history.append({"role": "assistant", "content": output_text.strip()})
 
-        print("--------------------------------------------------------------------------------")
-        print(f" HTTP Range Requests Sent   : {engine.total_range_requests}")
-        print(f" Total Data Streamed        : {engine.total_bytes_streamed / (1024*1024):.2f} MB")
-        print("--------------------------------------------------------------------------------")
+        print("\033[90m--------------------------------------------------------------------------------")
+        print(f" ⚡ Throughput: {tps:.2f} tokens/sec | Latency: {avg_lat:.1f} ms/token | Streamed: {engine.total_bytes_streamed / (1024*1024):.2f} MB")
+        print(f" 🌐 HTTP Range Requests Sent: {engine.total_range_requests}")
+        print("--------------------------------------------------------------------------------\033[0m")
 
 if __name__ == "__main__":
     main()

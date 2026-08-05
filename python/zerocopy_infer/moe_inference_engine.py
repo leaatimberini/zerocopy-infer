@@ -25,6 +25,8 @@ import concurrent.futures
 from .hf_range_stream import SafetensorsRangeStreamer
 from .tokenizer import ZeroCopyKimiTokenizer
 from .mxfp4_dequant import dequantize_mxfp4
+from .hardware_detector import HardwareDetector
+from .optimized_kernels import dispatch_matmul, dispatch_dot, dispatch_mxfp4_dequant
 
 class KimiK3Config:
     """
@@ -144,6 +146,18 @@ class ZeroCopyMoEEngine:
                 num_experts_per_token=top_k_experts if top_k_experts is not None else 16,
             )
             
+        hw_info = HardwareDetector.detect()
+        is_mobile = "Android" in hw_info["os"] or hw_info["architecture"] in ["aarch64", "arm64"]
+        
+        if is_mobile:
+            ram_cache_gb = min(ram_cache_gb, 0.25)
+            max_workers = min(hw_info["threads"], 2)
+            if num_active_layers is None:
+                num_active_layers = min(self.config.num_hidden_layers, 24)
+        else:
+            ram_cache_gb = max(ram_cache_gb, 2.0)
+            max_workers = min(hw_info["threads"], 8)
+            
         self.ram_cache_gb = ram_cache_gb
         self.hidden_dim = self.config.hidden_size  # Exact Kimi-K3 hidden dimension: 7168
         self.moe_inter = self.config.moe_intermediate_size  # 3072 for routed expert FFN
@@ -161,7 +175,7 @@ class ZeroCopyMoEEngine:
         self.cache_lock = threading.Lock()
         
         # Thread pool for async layer prefetching
-        self.prefetch_executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+        self.prefetch_executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
         
         # Chat history & Telemetry
         self.chat_history: List[Dict[str, str]] = []
@@ -190,22 +204,36 @@ class ZeroCopyMoEEngine:
         if meta is None:
             return None
 
-        try:
-            arr = self.streamer.fetch_tensor(tensor_name)
-            arr_bytes = arr.nbytes
-            
-            with self.cache_lock:
-                while self.current_cache_bytes + arr_bytes > self.max_cache_bytes and self.tensor_lru_cache:
-                    k, evicted_arr = self.tensor_lru_cache.popitem(last=False)
-                    self.current_cache_bytes -= evicted_arr.nbytes
-                    del evicted_arr
-                    gc.collect()
-                    
-                self.tensor_lru_cache[tensor_name] = arr
-                self.current_cache_bytes += arr_bytes
-            return arr
-        except Exception:
-            return None
+        # Self-healing: Retry logic for network timeouts
+        for attempt in range(3):
+            try:
+                arr = self.streamer.fetch_tensor(tensor_name)
+                # Self-healing: Shape mismatch check
+                if arr.shape != fallback_shape:
+                    if np.prod(arr.shape) == np.prod(fallback_shape):
+                        arr = arr.reshape(fallback_shape)
+                    else:
+                        print(f" [Self-Healing] Shape mismatch for {tensor_name}: {arr.shape} != {fallback_shape}")
+                        return np.zeros(fallback_shape, dtype=np.float32)
+
+                arr_bytes = arr.nbytes
+                
+                with self.cache_lock:
+                    while self.current_cache_bytes + arr_bytes > self.max_cache_bytes and self.tensor_lru_cache:
+                        k, evicted_arr = self.tensor_lru_cache.popitem(last=False)
+                        self.current_cache_bytes -= evicted_arr.nbytes
+                        del evicted_arr
+                        gc.collect()
+                        
+                    self.tensor_lru_cache[tensor_name] = arr
+                    self.current_cache_bytes += arr_bytes
+                return arr
+            except Exception as e:
+                if attempt == 2:
+                    print(f" [Self-Healing] Failed to fetch {tensor_name} after 3 retries: {e}. Using zeroed fallback.")
+                    return np.zeros(fallback_shape, dtype=np.float32)
+                time.sleep(0.5)
+        return np.zeros(fallback_shape, dtype=np.float32)
 
     def fetch_mxfp4_weight_tensor(self, base_name: str, fallback_shape: Tuple[int, ...]) -> Optional[np.ndarray]:
         """
@@ -219,7 +247,7 @@ class ZeroCopyMoEEngine:
                 packed = self.fetch_weight_tensor(packed_name, (fallback_shape[0], fallback_shape[1] // 2))
                 scale = self.fetch_weight_tensor(scale_name, (fallback_shape[0], fallback_shape[1] // 32))
                 if packed is not None and scale is not None:
-                    return dequantize_mxfp4(packed.astype(np.uint8), scale.astype(np.uint8))
+                    return dispatch_mxfp4_dequant(packed.astype(np.uint8), scale.astype(np.uint8))
             except Exception:
                 pass
                 
@@ -279,12 +307,12 @@ class ZeroCopyMoEEngine:
         if W.ndim == 1:
             return W * x
         if W.shape[1] == x.shape[0]:
-            return np.matmul(W, x)
+            return dispatch_matmul(W, x)
         elif W.shape[0] == x.shape[0]:
-            return np.matmul(W.T, x)
+            return dispatch_matmul(W.T, x)
         else:
             min_dim = min(W.shape[1], x.shape[0])
-            return np.matmul(W[:min_dim, :min_dim], x[:min_dim])
+            return dispatch_matmul(W[:min_dim, :min_dim], x[:min_dim])
 
     def compute_kda_layer(self, layer_idx: int, hidden_states: np.ndarray) -> np.ndarray:
         """
@@ -471,6 +499,10 @@ class ZeroCopyMoEEngine:
             target_vocab_ranks.extend(complete_words)
         elif clean_latin:
             target_vocab_ranks.extend(clean_latin)
+
+        recent_indices = []
+        generated_token_ids = []
+        assistant_reply = ""
 
         for step in range(1, num_tokens + 1):
             start_time = time.time()
